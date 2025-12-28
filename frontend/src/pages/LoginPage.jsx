@@ -12,6 +12,28 @@ const LoginPage = () => {
     const { login, loginWithGoogle } = useAuth();
     const navigate = useNavigate();
 
+    // Map Firebase error codes to user-friendly messages
+    const getErrorMessage = (errorCode) => {
+        switch (errorCode) {
+            case 'auth/user-not-found':
+                return 'No account found with this email address.';
+            case 'auth/wrong-password':
+                return 'Incorrect password. Please try again.';
+            case 'auth/invalid-email':
+                return 'Please enter a valid email address.';
+            case 'auth/user-disabled':
+                return 'This account has been disabled. Contact support for help.';
+            case 'auth/too-many-requests':
+                return 'Too many failed login attempts. Please try again later.';
+            case 'auth/network-request-failed':
+                return 'Network error. Please check your connection.';
+            case 'auth/invalid-credential':
+                return 'Invalid email or password. Please check your credentials.';
+            default:
+                return 'Failed to sign in. Please try again.';
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
@@ -20,7 +42,13 @@ const LoginPage = () => {
             await login(email, password);
             navigate('/chat');
         } catch (err) {
-            setError('Failed to sign in. Check email/password.');
+            console.error('Login error:', err);
+            // Check if it's the email verification error from AuthContext
+            if (err.message && err.message.includes('verify your email')) {
+                setError('Please verify your email address before logging in. Check your inbox for the verification link.');
+            } else {
+                setError(getErrorMessage(err.code));
+            }
         }
         setLoading(false);
     };
@@ -32,7 +60,8 @@ const LoginPage = () => {
             await loginWithGoogle();
             navigate('/chat');
         } catch (err) {
-            setError('Failed to sign in with Google.');
+            console.error('Google sign-in error:', err);
+            setError('Failed to sign in with Google. Please try again.');
         }
         setLoading(false);
     };
@@ -48,7 +77,12 @@ const LoginPage = () => {
                     <p className="text-deep-brown/60">Sign in to continue your journey.</p>
                 </div>
 
-                {error && <div className="bg-red-100 text-red-600 p-3 rounded-lg mb-4 text-sm font-medium">{error}</div>}
+                {error && (
+                    <div className="bg-red-50 border-2 border-red-200 text-red-700 p-4 rounded-2xl mb-4 text-sm font-medium flex items-start gap-3">
+                        <span className="text-red-500 text-lg">⚠️</span>
+                        <span>{error}</span>
+                    </div>
+                )}
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>

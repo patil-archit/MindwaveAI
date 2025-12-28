@@ -4,3 +4,5 @@ python-multipart
 python-dotenv
 langchain-community
 langchain-google-genai
+requests
+huggingface_hub

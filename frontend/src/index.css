@@ -29,3 +29,26 @@
 .glass-input {
   @apply bg-white/60 backdrop-blur-md border border-white/60 rounded-full px-6 py-4 focus:outline-none focus:ring-2 focus:ring-uprock-yellow/50 transition-all text-deep-brown placeholder:text-deep-brown/40 shadow-inner;
 }
+
+/* Smooth Scroll Snap Styles */
+.snap-container {
+  scroll-snap-type: y mandatory;
+  scroll-behavior: smooth;
+  overflow-y: scroll;
+  height: 100vh;
+}
+
+.snap-section {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+
+/* Hide scrollbar but keep functionality */
+.snap-container::-webkit-scrollbar {
+  display: none;
+}
+
+.snap-container {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

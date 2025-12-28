@@ -12,20 +12,46 @@ const SignupPage = () => {
     const { signup, verifyEmail, logout } = useAuth();
     const navigate = useNavigate();
 
+    // Map Firebase error codes to user-friendly messages
+    const getErrorMessage = (errorCode) => {
+        switch (errorCode) {
+            case 'auth/email-already-in-use':
+                return 'An account with this email already exists. Please log in instead.';
+            case 'auth/weak-password':
+                return 'Password should be at least 6 characters long.';
+            case 'auth/invalid-email':
+                return 'Please enter a valid email address.';
+            case 'auth/operation-not-allowed':
+                return 'Email/password accounts are not enabled. Contact support.';
+            case 'auth/network-request-failed':
+                return 'Network error. Please check your connection.';
+            default:
+                return 'Failed to create account. Please try again.';
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        // Client-side validation
         if (password !== confirmPassword) {
-            return setError('Passwords do not match');
+            return setError('Passwords do not match.');
         }
+
+        if (password.length < 6) {
+            return setError('Password must be at least 6 characters long.');
+        }
+
         try {
             setError('');
             setLoading(true);
             const userCredential = await signup(email, password);
             await verifyEmail(userCredential.user);
             await logout(); // Force logout so they can't access chat
-            setError('Success! Verification email sent. Please check your inbox before logging in.');
+            setError('✅ Success! Verification email sent. Please check your inbox before logging in.');
         } catch (err) {
-            setError('Failed to create an account: ' + err.message);
+            console.error('Signup error:', err);
+            setError(getErrorMessage(err.code));
         }
         setLoading(false);
     };
@@ -41,7 +67,15 @@ const SignupPage = () => {
                     <p className="text-deep-brown/60">Create your safe space.</p>
                 </div>
 
-                {error && <div className={`p-3 rounded-lg mb-4 text-sm font-medium ${error.startsWith('Success') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>{error}</div>}
+                {error && (
+                    <div className={`p-4 rounded-2xl mb-4 text-sm font-medium flex items-start gap-3 ${error.startsWith('✅')
+                        ? 'bg-green-50 border-2 border-green-200 text-green-700'
+                        : 'bg-red-50 border-2 border-red-200 text-red-700'
+                        }`}>
+                        <span className="text-lg">{error.startsWith('✅') ? '✅' : '⚠️'}</span>
+                        <span>{error.replace('✅ ', '')}</span>
+                    </div>
+                )}
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
@@ -62,7 +96,9 @@ const SignupPage = () => {
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             required
+                            minLength="6"
                         />
+                        <p className="text-xs text-deep-brown/50 mt-1">Must be at least 6 characters</p>
                     </div>
                     <div>
                         <label className="block text-sm font-bold text-deep-brown mb-1">Confirm Password</label>

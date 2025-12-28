@@ -3,7 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Union, Dict, Any
 import os
+import requests
 from dotenv import load_dotenv
+from huggingface_hub import InferenceClient
 
 # LangChain + Gemini
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -31,50 +33,88 @@ app.add_middleware(
 
 # Initialize LLM
 api_key = os.getenv("GOOGLE_API_KEY")
+hf_api_key = os.getenv("HUGGINGFACE_API_KEY")
 llm = None
 if api_key:
     llm = ChatGoogleGenerativeAI(model="models/gemini-flash-latest", google_api_key=api_key)
 
-def classify_emotion(text: str) -> str:
+# Initialize Hugging Face client
+hf_client = None
+if hf_api_key:
+    hf_client = InferenceClient(api_key=hf_api_key)
+
+def classify_emotion_hf(text: str) -> str:
     """
-    Classify the emotion of the user's message.
+    Classify emotion using Hugging Face InferenceClient.
+    Model: j-hartmann/emotion-english-distilroberta-base
+    Returns: anger, disgust, fear, joy, neutral, sadness, surprise
     """
-    if not llm:
+    if not hf_client:
         return "neutral"
     
     try:
-        # Simple prompt for classification
-        msg = HumanMessage(content=f"Classify the emotion of this text into exactly one word (e.g., happy, sad, angry, neutral, excited, anxious). Text: '{text}'. Return ONLY the word.")
-        response = llm.invoke([msg])
+        result = hf_client.text_classification(
+            text,
+            model="j-hartmann/emotion-english-distilroberta-base"
+        )
         
-        # Handle both string and list responses
-        emotion_text = ""
-        if isinstance(response.content, str):
-            emotion_text = response.content
-        elif isinstance(response.content, list):
-            # Extract text from list of parts
-            parts = []
-            for part in response.content:
-                if isinstance(part, str):
-                    parts.append(part)
-                elif isinstance(part, dict) and 'text' in part:
-                    parts.append(part['text'])
-                elif hasattr(part, 'text'):
-                    parts.append(part.text)
-                else:
-                    parts.append(str(part))
-            emotion_text = " ".join(parts)
-        else:
-            emotion_text = str(response.content)
+        # Result is a list of classification results
+        if result and len(result) > 0:
+            # Get the emotion with highest score
+            top_emotion = max(result, key=lambda x: x['score'])
+            emotion = top_emotion['label'].lower()
+            return emotion
         
-        emotion = emotion_text.strip().lower()
-        # Clean up any extra punctuation
-        import re
-        emotion = re.sub(r'[^\w\s]', '', emotion)
-        return emotion
-    except Exception as e:
-        print(f"Error classifying emotion: {e}")
         return "neutral"
+    except Exception as e:
+        print(f"Error with Hugging Face emotion detection: {e}")
+        return "neutral"
+
+def classify_emotion(text: str) -> str:
+    """
+    Classify the emotion of the user's message.
+    TEMPORARILY DISABLED to save API quota.
+    """
+    # Temporarily disabled to save API quota
+    return "neutral"
+    
+    # Original code commented out to save quota
+    # if not llm:
+    #     return "neutral"
+    # 
+    # try:
+    #     # Simple prompt for classification
+    #     msg = HumanMessage(content=f"Classify the emotion of this text into exactly one word (e.g., happy, sad, angry, neutral, excited, anxious). Text: '{text}'. Return ONLY the word.")
+    #     response = llm.invoke([msg])
+    #     
+    #     # Handle both string and list responses
+    #     emotion_text = ""
+    #     if isinstance(response.content, str):
+    #         emotion_text = response.content
+    #     elif isinstance(response.content, list):
+    #         # Extract text from list of parts
+    #         parts = []
+    #         for part in response.content:
+    #             if isinstance(part, str):
+    #                 parts.append(part)
+    #             elif isinstance(part, dict) and 'text' in part:
+    #                 parts.append(part['text'])
+    #             elif hasattr(part, 'text'):
+    #                 parts.append(part.text)
+    #             else:
+    #                 parts.append(str(part))
+    #         emotion_text = " ".join(parts)
+    #     else:
+    #         emotion_text = str(response.content)
+    #     
+    #     emotion = emotion_text.strip().lower()
+    #     # Clean up any extra punctuation
+    #     import re
+    #     emotion = re.sub(r'[^\w\s]', '', emotion)
+    #     return emotion
+    # except Exception as e:
+    #     print(f"Error classifying emotion: {e}")
+    #     return "neutral"
 
 # Models
 class Message(BaseModel):
@@ -97,8 +137,8 @@ async def chat_endpoint(request: ChatRequest):
     uid = request.uid
     remote_history = request.history
     
-    # 1. Detect Emotion
-    emotion = classify_emotion(user_msg)
+    # 1. Detect Emotion using Hugging Face
+    emotion = classify_emotion_hf(user_msg)
     
     # 2. Generate Response
     if not llm:
