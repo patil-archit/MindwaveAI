@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-warm-bg text-deep-brown antialiased;
+    background-image: radial-gradient(circle at 100% 0%, rgba(255, 233, 90, 0.1) 0%, transparent 25%),
+      radial-gradient(circle at 0% 100%, rgba(255, 99, 0, 0.05) 0%, transparent 25%);
+  }
+}
+
+.glass-panel {
+  @apply bg-glass-white backdrop-blur-xl border border-white/40 shadow-xl rounded-4xl;
+}
+
+.bubble-user {
+  @apply bg-deep-brown text-warm-bg rounded-t-4xl rounded-bl-4xl rounded-br-lg shadow-md;
+}
+
+.bubble-ai {
+  @apply bg-white text-deep-brown border border-white/60 rounded-t-4xl rounded-br-4xl rounded-bl-lg shadow-sm;
+}
+
+.uprock-btn {
+  @apply bg-uprock-yellow text-deep-brown font-bold px-8 py-4 rounded-full shadow-lg hover:shadow-uprock-yellow/40 transition-all hover:-translate-y-1 active:scale-95 flex items-center gap-2;
+}
+
+.glass-input {
+  @apply bg-white/60 backdrop-blur-md border border-white/60 rounded-full px-6 py-4 focus:outline-none focus:ring-2 focus:ring-uprock-yellow/50 transition-all text-deep-brown placeholder:text-deep-brown/40 shadow-inner;
+}
