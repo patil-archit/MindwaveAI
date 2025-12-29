@@ -2,10 +2,11 @@
 """Test Hugging Face emotion detection with InferenceClient"""
 
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 from huggingface_hub import InferenceClient
 
-load_dotenv()
+load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env")
 
 hf_api_key = os.getenv("HUGGINGFACE_API_KEY")
 print(f"HF API Key loaded: {'Yes' if hf_api_key else 'No'}")
