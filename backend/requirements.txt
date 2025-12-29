@@ -6,3 +6,4 @@ langchain-community
 langchain-google-genai
 requests
 huggingface_hub
+supabase

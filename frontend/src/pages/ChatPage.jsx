@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Menu, Plus, User, Sparkles, Smile, Frown, Zap, HelpCircle, AlertCircle, Trash2 } from 'lucide-react';
+import { Send, Menu, Plus, User, Sparkles, Smile, Frown, Zap, HelpCircle, AlertCircle, Trash2, Edit2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { db } from '../firebase';
-import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from 'firebase/firestore';
+// Supabase import removed for security - using Backend API now
+// Supabase import removed for security - using Backend API now
 
 // Emotion icons mapping
 const EmotionIcon = ({ emotion }) => {
@@ -114,61 +114,92 @@ const ChatPage = () => {
     const currentChat = chats.find(chat => chat.id === currentChatId);
     const messages = currentChat?.messages || [];
 
-    // Load chats from localStorage on mount
+    // Load chats from Supabase or localStorage
     useEffect(() => {
         if (!currentUser) return;
 
-        const chatsKey = `chats_${currentUser.uid}`;
-        const currentChatKey = `currentChatId_${currentUser.uid}`;
-
-        const savedChats = localStorage.getItem(chatsKey);
-        const savedCurrentChatId = localStorage.getItem(currentChatKey);
-
-        if (savedChats) {
+        const loadChats = async () => {
             try {
-                const parsedChats = JSON.parse(savedChats);
-                // Convert timestamp strings back to Date objects
-                const chatsWithDates = parsedChats.map(chat => ({
-                    ...chat,
-                    createdAt: new Date(chat.createdAt),
-                    lastUpdated: new Date(chat.lastUpdated),
-                    messages: chat.messages.map(msg => ({
-                        ...msg,
-                        timestamp: new Date(msg.timestamp),
-                        createdAt: new Date(msg.createdAt)
-                    }))
-                }));
-                setChats(chatsWithDates);
+                // Load from Backend API
+                const response = await fetch(`${API_BASE_URL}/chats/${currentUser.uid}`);
+                if (!response.ok) throw new Error('Failed to fetch chats');
 
-                if (savedCurrentChatId && chatsWithDates.find(c => c.id === savedCurrentChatId)) {
-                    setCurrentChatId(savedCurrentChatId);
-                } else if (chatsWithDates.length > 0) {
-                    setCurrentChatId(chatsWithDates[0].id);
+                const chatsData = await response.json();
+
+                if (chatsData && chatsData.length > 0) {
+                    const loadedChats = chatsData.map(chat => ({
+                        id: chat.id,
+                        title: chat.title,
+                        messages: chat.messages || [],
+                        createdAt: new Date(chat.created_at),
+                        lastUpdated: new Date(chat.updated_at)
+                    }));
+                    setChats(loadedChats);
+                    setCurrentChatId(loadedChats[0].id);
+                    return;
                 }
             } catch (error) {
-                console.error('Error loading chats:', error);
+                console.error('API load failed, using localStorage:', error);
+            }
+
+            // Fallback to localStorage
+            const chatsKey = `chats_${currentUser.uid}`;
+            const currentChatKey = `currentChatId_${currentUser.uid}`;
+
+            const savedChats = localStorage.getItem(chatsKey);
+            const savedCurrentChatId = localStorage.getItem(currentChatKey);
+
+            if (savedChats) {
+                try {
+                    const parsedChats = JSON.parse(savedChats);
+                    const chatsWithDates = parsedChats.map(chat => ({
+                        ...chat,
+                        createdAt: new Date(chat.createdAt),
+                        lastUpdated: new Date(chat.lastUpdated),
+                        messages: chat.messages.map(msg => ({
+                            ...msg,
+                            timestamp: new Date(msg.timestamp),
+                            createdAt: new Date(msg.createdAt)
+                        }))
+                    }));
+                    setChats(chatsWithDates);
+
+                    if (savedCurrentChatId && chatsWithDates.find(c => c.id === savedCurrentChatId)) {
+                        setCurrentChatId(savedCurrentChatId);
+                    } else if (chatsWithDates.length > 0) {
+                        setCurrentChatId(chatsWithDates[0].id);
+                    }
+                } catch (error) {
+                    console.error('Error loading chats from localStorage:', error);
+                    createNewChat();
+                }
+            } else {
                 createNewChat();
             }
-        } else {
-            // Create first chat if none exist
-            createNewChat();
-        }
+        };
+
+        loadChats();
     }, [currentUser]);
 
-    // Save chats to localStorage whenever they change
+    // Save chats to localStorage as fallback when Firestore is not available
     useEffect(() => {
         if (!currentUser || chats.length === 0) return;
 
-        const chatsKey = `chats_${currentUser.uid}`;
-        const currentChatKey = `currentChatId_${currentUser.uid}`;
+        // Save if any chat has messages
+        const hasMessages = chats.some(chat => chat.messages && chat.messages.length > 0);
 
-        try {
-            localStorage.setItem(chatsKey, JSON.stringify(chats));
-            if (currentChatId) {
-                localStorage.setItem(currentChatKey, currentChatId);
+        if (hasMessages) {
+            const chatsKey = `chats_${currentUser.uid}`;
+            const currentChatKey = `currentChatId_${currentUser.uid}`;
+
+            try {
+                localStorage.setItem(chatsKey, JSON.stringify(chats));
+                if (currentChatId) {
+                    localStorage.setItem(currentChatKey, currentChatId);
+                }
+            } catch (error) {
+                console.error('Error saving chats to localStorage:', error);
             }
-        } catch (error) {
-            console.error('Error saving chats:', error);
         }
     }, [chats, currentChatId, currentUser]);
 
@@ -195,30 +226,63 @@ const ChatPage = () => {
         return text.length < firstMessage.length ? text + '...' : text;
     };
 
-    const createNewChat = () => {
-        const newChat = {
-            id: `chat_${Date.now()}`,
+    const createNewChat = async () => {
+        const newChatData = {
             title: 'New Chat',
             messages: [],
             createdAt: new Date(),
             lastUpdated: new Date()
         };
-        setChats(prev => [newChat, ...prev]);
-        setCurrentChatId(newChat.id);
+
+        // Optimistic update: add to local state immediately
+        const tempId = `temp_${Date.now()}`;
+        const tempChat = { id: tempId, ...newChatData };
+        setChats(prev => [tempChat, ...prev]);
+        setCurrentChatId(tempId);
         setCurrentEmotion('neutral');
+
+        try {
+            // Call Backend API
+            const response = await fetch(`${API_BASE_URL}/chats`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: currentUser.uid,
+                    title: 'New Chat'
+                })
+            });
+
+            if (!response.ok) throw new Error('Failed to create chat');
+            const data = await response.json();
+
+            // Update with real ID
+            setChats(prev => prev.map(chat =>
+                chat.id === tempId ? { ...chat, id: data.id } : chat
+            ));
+            setCurrentChatId(data.id);
+        } catch (error) {
+            console.error('Backend create failed, keeping local chat:', error);
+            // Keep the temp chat
+        }
     };
 
     const switchChat = (chatId) => {
         setCurrentChatId(chatId);
     };
 
-    const deleteChat = (chatId, e) => {
+    const deleteChat = async (chatId, e) => {
         e.stopPropagation();
+
+        if (!chatId && chatId !== 0) {
+            console.error('Invalid chatId:', chatId);
+            return;
+        }
 
         if (!confirm('Are you sure you want to delete this chat?')) {
             return;
         }
 
+        // Optimistic update: remove from local state immediately
         setChats(prev => prev.filter(chat => chat.id !== chatId));
 
         if (chatId === currentChatId) {
@@ -229,25 +293,117 @@ const ChatPage = () => {
                 createNewChat();
             }
         }
+
+        // Skip Supabase for temp chats (which are strings starting with temp_)
+        if (typeof chatId === 'string' && chatId.startsWith('temp_')) return;
+
+        try {
+            // Call Backend API
+            const response = await fetch(`${API_BASE_URL}/chats/${chatId}`, {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) throw new Error('Failed to delete chat');
+        } catch (error) {
+            console.error('Backend delete failed, but local state updated:', error);
+            // Local state is already updated
+        }
     };
 
-    const updateCurrentChat = (updater) => {
+    const renameChat = async (chatId, currentTitle, e) => {
+        e.stopPropagation();
+        const newTitle = prompt("Enter new chat name:", currentTitle);
+        if (!newTitle || newTitle.trim() === currentTitle) return;
+
+        // Optimistic update
         setChats(prev => prev.map(chat =>
-            chat.id === currentChatId
-                ? { ...chat, ...updater(chat), lastUpdated: new Date() }
-                : chat
+            chat.id === chatId ? { ...chat, title: newTitle.trim() } : chat
         ));
+
+        // Skip Supabase for temp chats
+        if (typeof chatId === 'string' && chatId.startsWith('temp_')) return;
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/chats/${chatId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: newTitle.trim() })
+            });
+
+            if (!response.ok) throw new Error('Failed to rename chat');
+        } catch (error) {
+            console.error('Rename failed:', error);
+            alert('Failed to rename chat. Check backend logs.');
+        }
     };
+
+    const updateCurrentChat = async (updater) => {
+        if (!currentChatId) return;
+
+        const currentChat = chats.find(c => c.id === currentChatId);
+        if (!currentChat) return;
+
+        const updatedChat = { ...currentChat, ...updater(currentChat), lastUpdated: new Date() };
+
+        // Optimistic update: update local state immediately
+        setChats(prev => prev.map(chat =>
+            chat.id === currentChatId ? updatedChat : chat
+        ));
+
+        // Skip Supabase for temp chats
+        if (typeof currentChatId === 'string' && currentChatId.startsWith('temp_')) return;
+
+        // updateCurrentChat is primarily for optimistic local updates now.
+        // Backend syncing happens via specific actions (sendMessage, renameChat).
+        // So we don't need to call Supabase here anymore for generic updates.
+        // If we need to sync messages, sendMessage handles it.
+        // If we need to sync title, renameChat handles it.
+
+    };
+
+    // Helper to sync local state with Supabase without triggering a full reload
+    // We might not need this if we trust the backend, but for safety in "Optimistic UI"
+    // we keep the local update logic but REMOVE the explicit Supabase calls inside sendMessage
+    // No, `updateCurrentChat` DOES call Supabase.
+    // We should modify `sendMessage` to NOT call `updateCurrentChat` if it triggers a Supabase write 
+    // that conflicts with backend writing.
+    // However, `updateCurrentChat` writes the WHOLE message array.
+    // If backend writes to array, and frontend writes to array, we have a race condition.
+    // SOLUTION:
+    // 1. Frontend Optimistic Update (Local State ONLY) -> Show message immediately.
+    // 2. Send to Backend -> Backend saves User Msg + AI Msg.
+    // 3. Backend returns response.
+    // 4. Frontend re-fetches or trusts the response and updates local state?
+    // ERROR: If we don't save to Supabase from Frontend, and Backend fails, message is lost? 
+    // BUT if we both save, we get race conditions.
+    // BEST: Frontend saves User Message (or we let backend do it).
+    // The plan said: "Remove frontend-side Supabase insert calls for messages (let backend handle it)."
+    // So we should NOT call `updateCurrentChat` which calls `supabase.update`.
+    // OR we modify `updateCurrentChat` to have a flag `skipSupabase`.
+
+    // Let's modify `updateCurrentChat` to accept a `skipSupabase` flag?
+    // Or just manually update state in `sendMessage`.
+
+    // Let's manually update state to avoid the Supabase write in `sendMessage`.
 
     const sendMessage = async (e) => {
         e.preventDefault();
-        if (!input.trim() || loading || !currentUser || !currentChatId) return;
+        if (!input.trim() || loading || !currentUser || !currentChatId) {
+            console.warn('Cannot send message:', { input: input.trim(), loading, currentUser: !!currentUser, currentChatId });
+            return;
+        }
+
+        // Ensure currentChatId is valid
+        if (!currentChatId && currentChatId !== 0) {
+            console.error('Invalid currentChatId:', currentChatId);
+            return;
+        }
 
         const userText = input;
         setInput('');
         setLoading(true);
 
-        // Add user message to current chat
+        // Create user message
         const userMessage = {
             id: Date.now().toString() + '-user',
             sender: 'user',
@@ -258,34 +414,44 @@ const ChatPage = () => {
             createdAt: new Date()
         };
 
-        // Update chat title if this is the first message
-        updateCurrentChat(chat => {
-            const newMessages = [...chat.messages, userMessage];
-            const updates = { messages: newMessages };
-
-            if (chat.title === 'New Chat' && newMessages.length === 1) {
-                updates.title = generateChatTitle(userText);
+        // Optimistic UI Update (Local Only)
+        setChats(prev => prev.map(chat => {
+            if (chat.id === currentChatId) {
+                const newMessages = [...chat.messages, userMessage];
+                let title = chat.title;
+                if (chat.title === 'New Chat' && chat.messages.length === 0) {
+                    title = generateChatTitle(userText);
+                }
+                return { ...chat, messages: newMessages, title, lastUpdated: new Date() };
             }
-
-            return updates;
-        });
+            return chat;
+        }));
 
         try {
-            // Prepare History for Backend (Last 10 messages)
-            const history = messages.slice(-10).map(m => ({
+            // Prepare History for Backend (Last 10 messages including the new one)
+            const updatedMessages = [...messages, userMessage];
+            const history = updatedMessages.slice(-11).slice(0, -1).map(m => ({
                 role: m.sender === 'user' ? 'user' : 'ai',
                 content: m.text
             }));
 
             // Call Backend
+            const payload = {
+                message: userText,
+                uid: String(currentUser.uid),
+                chat_id: String(currentChatId)
+            };
+
+            // Calculate title if new chat
+            const chatToUpdate = chats.find(c => c.id === currentChatId);
+            if (chatToUpdate && chatToUpdate.title === 'New Chat' && (!chatToUpdate.messages || chatToUpdate.messages.length === 0)) {
+                payload.title = generateChatTitle(userText);
+            }
+
             const response = await fetch(`${API_BASE_URL}/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    messages: history.concat([{ role: 'user', content: userText }]),
-                    uid: currentUser.uid,
-                    history: history
-                })
+                body: JSON.stringify(payload)
             });
 
             if (!response.ok) {
@@ -294,7 +460,7 @@ const ChatPage = () => {
 
             const data = await response.json();
 
-            // Add AI response to current chat
+            // Create AI response
             const aiMessage = {
                 id: Date.now().toString() + '-ai',
                 sender: 'ai',
@@ -305,15 +471,19 @@ const ChatPage = () => {
                 createdAt: new Date()
             };
 
-            updateCurrentChat(chat => ({
-                messages: [...chat.messages, aiMessage]
+            // Add AI response to Local State (Backend already saved it)
+            setChats(prev => prev.map(chat => {
+                if (chat.id === currentChatId) {
+                    return { ...chat, messages: [...chat.messages, aiMessage], lastUpdated: new Date() };
+                }
+                return chat;
             }));
 
             setCurrentEmotion(data.emotion);
 
         } catch (error) {
             console.error("Error sending message:", error);
-            // Add error message to chat
+            // Add error message and save to Supabase
             const errorMessage = {
                 id: Date.now().toString() + '-error',
                 sender: 'ai',
@@ -323,8 +493,11 @@ const ChatPage = () => {
                 emotion: 'neutral',
                 createdAt: new Date()
             };
-            updateCurrentChat(chat => ({
-                messages: [...chat.messages, errorMessage]
+            setChats(prev => prev.map(chat => {
+                if (chat.id === currentChatId) {
+                    return { ...chat, messages: [...chat.messages, errorMessage], lastUpdated: new Date() };
+                }
+                return chat;
             }));
         } finally {
             setLoading(false);
@@ -356,6 +529,12 @@ const ChatPage = () => {
                             <p className="text-2xl md:text-3xl text-white/90 font-medium">
                                 — {currentQuote.author}
                             </p>
+                            <button
+                                onClick={() => setShowSplash(false)}
+                                className="mt-12 px-8 py-3 bg-white/20 hover:bg-white/30 text-white rounded-full font-semibold backdrop-blur-sm transition-all border border-white/40"
+                            >
+                                Skip
+                            </button>
                         </motion.div>
                     </motion.div>
                 )}
@@ -398,13 +577,22 @@ const ChatPage = () => {
                                                     {new Date(chat.lastUpdated).toLocaleDateString()}
                                                 </div>
                                             </div>
-                                            <button
-                                                onClick={(e) => deleteChat(chat.id, e)}
-                                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-100 rounded-lg"
-                                                title="Delete chat"
-                                            >
-                                                <Trash2 size={16} className="text-red-600" />
-                                            </button>
+                                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button
+                                                    onClick={(e) => renameChat(chat.id, chat.title, e)}
+                                                    className="p-1 hover:bg-gray-100 rounded-lg text-deep-brown/60 hover:text-deep-brown"
+                                                    title="Rename chat"
+                                                >
+                                                    <Edit2 size={14} />
+                                                </button>
+                                                <button
+                                                    onClick={(e) => deleteChat(chat.id, e)}
+                                                    className="p-1 hover:bg-red-100 rounded-lg text-red-400 hover:text-red-600"
+                                                    title="Delete chat"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 ))}

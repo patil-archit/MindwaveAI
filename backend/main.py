@@ -14,6 +14,7 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_core.chat_history import InMemoryChatMessageHistory
 from langchain_core.runnables.history import RunnableWithMessageHistory
+from supabase_client import save_message, get_chat_history, create_chat_in_db, get_user_chats_from_db, delete_chat_from_db, rename_chat_in_db
 
 # Load environment variables (always from backend/.env)
 load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env")
@@ -124,9 +125,19 @@ class Message(BaseModel):
     emotion: Optional[str] = "neutral"
 
 class ChatRequest(BaseModel):
-    messages: List[Message]
-    uid: Optional[str] = "default"
-    history: List[Message] = [] # Recent chat history from frontend
+    messages: Optional[List[Message]] = None # Deprecated, but kept for compatibility checks if needed
+    message: str # The new user message
+    uid: str
+    chat_id: str
+    title: Optional[str] = None
+    history: Optional[List[Message]] = None # Optional, ignored in favor of backend history
+
+class CreateChatRequest(BaseModel):
+    user_id: str
+    title: str
+
+class RenameChatRequest(BaseModel):
+    title: str
 
 class ChatResponse(BaseModel):
     response: str
@@ -134,39 +145,81 @@ class ChatResponse(BaseModel):
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):
-    user_msg = request.messages[-1].content
+    user_msg = request.message
     uid = request.uid
-    remote_history = request.history
+    chat_id = request.chat_id
+    
+    # 0. Persist User Message (Early save)
+    # emotion is not yet known, so we default to 'neutral' or could try to classify first. 
+    # For now, we save it as 'neutral' or maybe update it later? 
+    # Actually, let's classify first so we can save with emotion if we want, 
+    # but usually user emotion is derived from text.
     
     # 1. Detect Emotion using Hugging Face
     emotion = classify_emotion_hf(user_msg)
     
-    # 2. Generate Response
+    # Save User message to Supabase
+    save_message(chat_id, uid, "user", user_msg, emotion, title=request.title)
+
+    # 2. Fetch History from Supabase (Backend Source of Truth)
+    # We fetch AFTER saving the new message, so the new message is included?
+    # No, typically history is "past" messages. 
+    # But `supabase_client.save_message` appends to the array.
+    # So if we fetch now, we get everything including current.
+    # Let's see how `supabase_client` behaves. It appends.
+    # So `all_messages` will contain the new one.
+    
+    history_dicts = get_chat_history(chat_id)
+    
+    # 3. Generate Response
     if not llm:
         return ChatResponse(response="Gemini API Key is missing. Please check your .env file.", emotion="neutral")
     
     try:
         system_prompt = (
-            f"You are a helpful and empathetic AI companion. "
+            f"You are a deeply empathetic, emotionally intelligent, and supportive AI companion. "
+            f"Your goal is to make the user feel heard, understood, and comforted, while providing actionable advice. "
             f"The user is currently feeling {emotion.upper()}. "
-            f"Adjust your tone to support this emotion. "
-            f"Keep responses concise and conversational."
+            f"1. Validation: Sincerely acknowledge their feelings and validate them (e.g., 'I hear you, and it's okay to feel this way'). "
+            f"2. Tone: Be warm, caring, and gentle. Adjust your tone to match their emotional state. "
+            f"3. Structure & Depth: "
+            f"   - Start with empathy. "
+            f"   - Provide 3-4 concrete, actionable suggestions or steps to help improve their mood or situation. "
+            f"   - Use bullet points or numbered lists for clarity (like a professional GPT response). "
+            f"4. Objective: Help the user feel better and empowered. Focus on emotional connection + practical help. "
+            f"5. Formatting: Use standard Markdown (bold, lists). Do NOT use HTML tags."
         )
 
-        # Build messages from Frontend History (Stateless Mode)
         lc_messages = [SystemMessage(content=system_prompt)]
         
-        # Add history (excluding the very last user message if it's already in history, usually it's not)
-        for msg in remote_history:
-             if msg.role == "user":
-                 lc_messages.append(HumanMessage(content=msg.content))
-             elif msg.role == "ai" or msg.role == "assistant":
-                 lc_messages.append(AIMessage(content=msg.content))
+        # Add history
+        # We need to filter out the *current* message if it's already in history 
+        # to avoid duplication when we append it again explicitly?
+        # Actually, `llm.invoke` takes a list of messages.
+        # If `history_dicts` includes the latest message, we just pass that.
+        # But `SystemMessage` is separate.
         
-        # Add current message
-        lc_messages.append(HumanMessage(content=user_msg))
+        for msg in history_dicts:
+             role = msg["role"]
+             content = msg["content"]
+             if role == "user":
+                 lc_messages.append(HumanMessage(content=content))
+             elif role == "ai" or role == "assistant":
+                 lc_messages.append(AIMessage(content=content))
         
-        # Invoke directly (No internal memory needed as we pass full context)
+        # The latest message was just saved to DB, so it IS in `history_dicts`. 
+        # EXCEPT `save_message` implementation in `supabase_client.py` 
+        # reads the DB, appends, and writes back.
+        # So `get_chat_history` calls `select` and should see it.
+        # However, to be safe and avoid race conditions (consistency), 
+        # we can just use the memory we have.
+        # But let's trust the DB for now or just ensure we don't duplicate.
+        
+        # If `history_dicts` is empty (failed fetch), we at least add the current message.
+        if not history_dicts:
+            lc_messages.append(HumanMessage(content=user_msg))
+
+        # Invoke
         response = llm.invoke(lc_messages)
         ai_content = response.content
         
@@ -192,12 +245,42 @@ async def chat_endpoint(request: ChatRequest):
         else:
             ai_text = str(ai_content)
         
+        # Save AI Response to Supabase
+        save_message(chat_id, uid, "ai", ai_text, emotion)
+
         return ChatResponse(response=ai_text, emotion=emotion)
 
     except Exception as e:
         print(f"Error generating response: {e}")
         return ChatResponse(response=f"I'm having trouble thinking right now. (Error: {str(e)})", emotion=emotion)
 
+@app.post("/chats")
+async def create_chat_endpoint(request: CreateChatRequest):
+    result = create_chat_in_db(request.user_id, request.title)
+    if not result:
+        raise HTTPException(status_code=500, detail="Failed to create chat")
+    return result
+
+@app.get("/chats/{uid}")
+async def get_chats_endpoint(uid: str):
+    chats = get_user_chats_from_db(uid)
+    return chats
+
+@app.delete("/chats/{chat_id}")
+async def delete_chat_endpoint(chat_id: str):
+    success = delete_chat_from_db(chat_id)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to delete chat")
+    return {"status": "success"}
+
+@app.patch("/chats/{chat_id}")
+async def rename_chat_endpoint(chat_id: str, request: RenameChatRequest):
+    success = rename_chat_in_db(chat_id, request.title)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to rename chat")
+    return {"status": "success"}
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
