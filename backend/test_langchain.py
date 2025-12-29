@@ -2,12 +2,13 @@
 """Test script to verify LangChain + Gemini integration"""
 
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage
 
 # Load environment
-load_dotenv()
+load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env")
 
 api_key = os.getenv("GOOGLE_API_KEY")
 print(f"API Key loaded: {'Yes' if api_key else 'No'}")

@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Union, Dict, Any
 import os
+from pathlib import Path
 import requests
 from dotenv import load_dotenv
 from huggingface_hub import InferenceClient
@@ -14,8 +15,8 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_core.chat_history import InMemoryChatMessageHistory
 from langchain_core.runnables.history import RunnableWithMessageHistory
 
-# Load environment variables
-load_dotenv()
+# Load environment variables (always from backend/.env)
+load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env")
 
 # ... imports ...
 

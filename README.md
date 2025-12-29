@@ -68,9 +68,18 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-4. Create `.env` file:
+4. Create `backend/.env` file (copy the example and fill it in):
 ```bash
+cp .env.example .env
+```
+
+`backend/.env`:
+```bash
+# Required
 GOOGLE_API_KEY=your_gemini_api_key_here
+
+# Optional (enables emotion detection)
+HUGGINGFACE_API_KEY=your_huggingface_token_here
 ```
 
 5. Run the server:
@@ -90,7 +99,10 @@ cd frontend
 npm install
 ```
 
-3. Update Firebase config in `src/firebase.js` with your Firebase project credentials
+3. Create `frontend/.env` (copy the example and fill it in):
+```bash
+cp .env.example .env
+```
 
 4. Run the development server:
 ```bash
@@ -101,19 +113,24 @@ npm run dev
 
 ## Environment Variables
 
-### Backend (.env)
-```
+### Backend (`backend/.env`)
+```bash
 GOOGLE_API_KEY=your_google_gemini_api_key
+HUGGINGFACE_API_KEY=your_huggingface_token  # optional
 ```
 
-### Frontend
-Update `src/firebase.js` with your Firebase configuration:
-- apiKey
-- authDomain
-- projectId
-- storageBucket
-- messagingSenderId
-- appId
+### Frontend (`frontend/.env`)
+```bash
+VITE_API_BASE_URL=http://localhost:8000
+
+VITE_FIREBASE_API_KEY=...
+VITE_FIREBASE_AUTH_DOMAIN=...
+VITE_FIREBASE_PROJECT_ID=...
+VITE_FIREBASE_STORAGE_BUCKET=...
+VITE_FIREBASE_MESSAGING_SENDER_ID=...
+VITE_FIREBASE_APP_ID=...
+VITE_FIREBASE_MEASUREMENT_ID=... # optional
+```
 
 ## API Endpoints
 

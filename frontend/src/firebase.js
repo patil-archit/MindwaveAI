@@ -1,19 +1,30 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
-// TODO: Replace with your actual Firebase project config
-// Get this from: https://console.firebase.google.com
 const firebaseConfig = {
-    apiKey: "AIzaSyCYRBpEdKip6KWLUhmzrkO4w-qiNxpYsyc",
-    authDomain: "mindwaveai-b10ac.firebaseapp.com",
-    projectId: "mindwaveai-b10ac",
-    storageBucket: "mindwaveai-b10ac.firebasestorage.app",
-    messagingSenderId: "792056638792",
-    appId: "1:792056638792:web:872532110030549eed177d",
-    measurementId: "G-DCCV7G0SZL"
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID,
+    measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
-import { getFirestore } from "firebase/firestore";
+const requiredEnvVars = [
+    "VITE_FIREBASE_API_KEY",
+    "VITE_FIREBASE_AUTH_DOMAIN",
+    "VITE_FIREBASE_PROJECT_ID",
+    "VITE_FIREBASE_STORAGE_BUCKET",
+    "VITE_FIREBASE_MESSAGING_SENDER_ID",
+    "VITE_FIREBASE_APP_ID"
+];
+
+const missingEnvVars = requiredEnvVars.filter((envVar) => !import.meta.env[envVar]);
+if (missingEnvVars.length > 0) {
+    throw new Error(`Missing Firebase env vars: ${missingEnvVars.join(", ")}. Copy frontend/.env.example to frontend/.env and fill them in.`);
+}
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
