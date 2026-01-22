@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Sparkles, ArrowRight, Heart, Brain, Heart as HeartIcon, MessageCircle, Zap, CheckCircle, ChevronDown } from 'lucide-react';
+import { Sparkles, ArrowRight, Heart, Brain, Heart as HeartIcon, MessageCircle, Zap, CheckCircle, ChevronDown, Activity } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const LandingPage = () => {
@@ -133,6 +133,14 @@ const LandingPage = () => {
                         >
                             Start Talking
                             <ArrowRight className="w-5 h-5" />
+                        </Link>
+
+                        <Link
+                            to="/physical-health"
+                            className="px-8 py-4 rounded-full bg-gradient-to-r from-uprock-orange to-uprock-yellow text-white font-semibold transition-all hover:shadow-xl flex items-center gap-2"
+                        >
+                            <Activity className="w-5 h-5" />
+                            Physical Health
                         </Link>
 
                         <Link

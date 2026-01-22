@@ -9,6 +9,8 @@ import AboutPage from './pages/AboutPage';
 import FeelBetterPage from './pages/FeelBetterPage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
+import MemorySearchPage from './pages/MemorySearchPage';
+import PhysicalDataPage from './pages/PhysicalDataPage';
 import PrivateRoute from './components/PrivateRoute';
 import { AuthProvider } from './context/AuthContext';
 
@@ -24,6 +26,11 @@ function App() {
             <Route path="/help" element={<HelpPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
+            <Route path="/search" element={
+              <PrivateRoute>
+                <MemorySearchPage />
+              </PrivateRoute>
+            } />
             <Route path="/profile" element={
               <PrivateRoute>
                 <ProfilePage />
@@ -32,6 +39,11 @@ function App() {
             <Route path="/chat" element={
               <PrivateRoute>
                 <ChatPage />
+              </PrivateRoute>
+            } />
+            <Route path="/physical-health" element={
+              <PrivateRoute>
+                <PhysicalDataPage />
               </PrivateRoute>
             } />
           </Routes>

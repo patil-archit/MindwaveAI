@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Menu, Plus, User, Sparkles, Smile, Frown, Zap, HelpCircle, AlertCircle, Trash2, Edit2 } from 'lucide-react';
+import { Send, Menu, Plus, User, Sparkles, Smile, Frown, Zap, HelpCircle, AlertCircle, Trash2, Edit2, Search, Network, Link as LinkIcon, Volume2, VolumeX } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-// Supabase import removed for security - using Backend API now
-// Supabase import removed for security - using Backend API now
+import useVoice from '../hooks/useVoice';
+import { Mic, MicOff } from 'lucide-react';
+import FaceSensor from '../components/FaceSensor';
+import BrainGraph from '../components/BrainGraph';
+import AmbientSynth from '../components/AmbientSynth';
+import TruthAnchor from '../components/TruthAnchor';
 
 // Emotion icons mapping
 const EmotionIcon = ({ emotion }) => {
@@ -26,11 +30,31 @@ const ChatPage = () => {
     const [currentChatId, setCurrentChatId] = useState(null);
     const [input, setInput] = useState('');
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [chatMode, setChatMode] = useState('auto'); // 'auto', 'stoic', 'nurturer', 'coach'
     const [currentEmotion, setCurrentEmotion] = useState('neutral');
+    const [showGraph, setShowGraph] = useState(false);
+    const [showAnchor, setShowAnchor] = useState(false);
+    const [graphData, setGraphData] = useState({ nodes: [], links: [] });
+    const [faceEmotion, setFaceEmotion] = useState('neutral');
     const [loading, setLoading] = useState(false);
     const [showSplash, setShowSplash] = useState(true);
     const [currentQuote, setCurrentQuote] = useState(null);
+    const [isTtsEnabled, setIsTtsEnabled] = useState(false); // TTS Toggle
+    const [activeThought, setActiveThought] = useState(null); // Modal State
     const messagesEndRef = useRef(null);
+
+    // Voice Hook
+    const { isListening, startListening, stopListening, transcript, setTranscript, speak, stopSpeaking, isSpeaking } = useVoice();
+
+    // Auto-fill input from voice and (Optional) Auto-send?
+    // Let's autosend for fluid conversation
+    useEffect(() => {
+        if (transcript) {
+            setInput(transcript);
+            // Optional: Auto-send after short delay if desired, or just let user click send.
+            // For now, just fill input. User review is better.
+        }
+    }, [transcript]);
 
     // Inspirational quotes collection
     const quotes = [
@@ -221,6 +245,22 @@ const ChatPage = () => {
 
     useEffect(scrollToBottom, [messages]);
 
+    const fetchGraph = async () => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/graph`);
+            const data = await res.json();
+            setGraphData(data);
+        } catch (e) {
+            console.error("Graph load failed", e);
+        }
+    };
+
+    useEffect(() => {
+        if (showGraph) {
+            fetchGraph();
+        }
+    }, [showGraph, messages]); // Refresh when messages change
+
     const generateChatTitle = (firstMessage) => {
         const text = firstMessage.substring(0, 30);
         return text.length < firstMessage.length ? text + '...' : text;
@@ -337,55 +377,6 @@ const ChatPage = () => {
         }
     };
 
-    const updateCurrentChat = async (updater) => {
-        if (!currentChatId) return;
-
-        const currentChat = chats.find(c => c.id === currentChatId);
-        if (!currentChat) return;
-
-        const updatedChat = { ...currentChat, ...updater(currentChat), lastUpdated: new Date() };
-
-        // Optimistic update: update local state immediately
-        setChats(prev => prev.map(chat =>
-            chat.id === currentChatId ? updatedChat : chat
-        ));
-
-        // Skip Supabase for temp chats
-        if (typeof currentChatId === 'string' && currentChatId.startsWith('temp_')) return;
-
-        // updateCurrentChat is primarily for optimistic local updates now.
-        // Backend syncing happens via specific actions (sendMessage, renameChat).
-        // So we don't need to call Supabase here anymore for generic updates.
-        // If we need to sync messages, sendMessage handles it.
-        // If we need to sync title, renameChat handles it.
-
-    };
-
-    // Helper to sync local state with Supabase without triggering a full reload
-    // We might not need this if we trust the backend, but for safety in "Optimistic UI"
-    // we keep the local update logic but REMOVE the explicit Supabase calls inside sendMessage
-    // No, `updateCurrentChat` DOES call Supabase.
-    // We should modify `sendMessage` to NOT call `updateCurrentChat` if it triggers a Supabase write 
-    // that conflicts with backend writing.
-    // However, `updateCurrentChat` writes the WHOLE message array.
-    // If backend writes to array, and frontend writes to array, we have a race condition.
-    // SOLUTION:
-    // 1. Frontend Optimistic Update (Local State ONLY) -> Show message immediately.
-    // 2. Send to Backend -> Backend saves User Msg + AI Msg.
-    // 3. Backend returns response.
-    // 4. Frontend re-fetches or trusts the response and updates local state?
-    // ERROR: If we don't save to Supabase from Frontend, and Backend fails, message is lost? 
-    // BUT if we both save, we get race conditions.
-    // BEST: Frontend saves User Message (or we let backend do it).
-    // The plan said: "Remove frontend-side Supabase insert calls for messages (let backend handle it)."
-    // So we should NOT call `updateCurrentChat` which calls `supabase.update`.
-    // OR we modify `updateCurrentChat` to have a flag `skipSupabase`.
-
-    // Let's modify `updateCurrentChat` to accept a `skipSupabase` flag?
-    // Or just manually update state in `sendMessage`.
-
-    // Let's manually update state to avoid the Supabase write in `sendMessage`.
-
     const sendMessage = async (e) => {
         e.preventDefault();
         if (!input.trim() || loading || !currentUser || !currentChatId) {
@@ -439,7 +430,10 @@ const ChatPage = () => {
             const payload = {
                 message: userText,
                 uid: String(currentUser.uid),
-                chat_id: String(currentChatId)
+                chat_id: String(currentChatId),
+                face_emotion: faceEmotion,
+                mode: chatMode,
+                email: currentUser.email || null // Pass user email
             };
 
             // Calculate title if new chat
@@ -468,6 +462,7 @@ const ChatPage = () => {
                 role: 'ai',
                 timestamp: new Date(),
                 emotion: data.emotion,
+                agent_thoughts: data.agent_thoughts, // Store thoughts
                 createdAt: new Date()
             };
 
@@ -480,6 +475,10 @@ const ChatPage = () => {
             }));
 
             setCurrentEmotion(data.emotion);
+
+            // Auto-enable TTS and speak the response
+            setIsTtsEnabled(true);
+            speak(data.response);
 
         } catch (error) {
             console.error("Error sending message:", error);
@@ -506,42 +505,8 @@ const ChatPage = () => {
 
     return (
         <>
-            {/* Quote Splash Screen */}
-            <AnimatePresence>
-                {showSplash && currentQuote && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.8 }}
-                        className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-uprock-orange via-uprock-yellow to-uprock-orange"
-                    >
-                        <motion.div
-                            initial={{ scale: 0.9, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            transition={{ delay: 0.3, duration: 0.6 }}
-                            className="max-w-4xl mx-auto px-8 text-center"
-                        >
-                            <Sparkles className="w-16 h-16 mx-auto mb-8 text-white animate-pulse" />
-                            <h2 className="text-4xl md:text-6xl font-bold text-white mb-8 leading-tight">
-                                "{currentQuote.text}"
-                            </h2>
-                            <p className="text-2xl md:text-3xl text-white/90 font-medium">
-                                — {currentQuote.author}
-                            </p>
-                            <button
-                                onClick={() => setShowSplash(false)}
-                                className="mt-12 px-8 py-3 bg-white/20 hover:bg-white/30 text-white rounded-full font-semibold backdrop-blur-sm transition-all border border-white/40"
-                            >
-                                Skip
-                            </button>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
             {/* Main Chat Interface */}
-            <div className="flex h-screen overflow-hidden p-4 pt-24 gap-6 bg-warm-bg font-sans">
+            <div className="flex h-screen overflow-hidden p-4 pt-24 gap-6 bg-warm-bg font-sans relative z-10">
                 {/* Sidebar */}
                 <AnimatePresence mode="wait">
                     {isSidebarOpen && (
@@ -554,11 +519,19 @@ const ChatPage = () => {
 
                             <button
                                 onClick={createNewChat}
-                                className="flex items-center gap-3 w-full p-4 mb-6 rounded-3xl bg-white shadow-sm hover:shadow-md transition-all text-deep-brown font-semibold border border-deep-brown/5"
+                                className="flex items-center gap-3 w-full p-4 mb-2 rounded-3xl bg-white shadow-sm hover:shadow-md transition-all text-deep-brown font-semibold border border-deep-brown/5"
                             >
                                 <Plus size={20} className="text-uprock-orange" />
                                 <span>New Chat</span>
                             </button>
+
+                            <Link
+                                to="/search"
+                                className="flex items-center gap-3 w-full p-4 mb-6 rounded-3xl bg-uprock-yellow/20 hover:bg-uprock-yellow/30 transition-all text-deep-brown font-semibold border border-uprock-yellow/50"
+                            >
+                                <Search size={20} className="text-deep-brown" />
+                                <span>Memory Vault</span>
+                            </Link>
 
                             <div className="flex-1 overflow-y-auto space-y-2 pr-2">
                                 {chats.map(chat => (
@@ -622,6 +595,34 @@ const ChatPage = () => {
                                 <Menu size={24} className="text-deep-brown" />
                             </button>
                             <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setShowGraph(!showGraph)}
+                                    className={`p-2 rounded-full transition-colors ${showGraph ? 'bg-uprock-orange text-white' : 'hover:bg-deep-brown/10 text-deep-brown'}`}
+                                    title="Toggle Neural Constellation"
+                                >
+                                    <Network size={20} />
+                                </button>
+                                <button
+                                    onClick={() => setShowAnchor(true)}
+                                    className="p-2 rounded-full hover:bg-deep-brown/10 text-deep-brown transition-colors"
+                                    title="Open Truth Anchor (Blockchain)"
+                                >
+                                    <LinkIcon size={20} />
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        if (isTtsEnabled) {
+                                            stopSpeaking();
+                                            setIsTtsEnabled(false);
+                                        } else {
+                                            setIsTtsEnabled(true);
+                                        }
+                                    }}
+                                    className={`p-2 rounded-full transition-colors ${isTtsEnabled ? 'bg-uprock-orange text-white' : 'hover:bg-deep-brown/10 text-deep-brown'}`}
+                                    title={isTtsEnabled ? "Disable Text-to-Speech" : "Enable Text-to-Speech"}
+                                >
+                                    {isTtsEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+                                </button>
                                 <span className="font-bold text-lg text-deep-brown">Mindwave AI</span>
                                 <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${currentEmotion === 'angry' ? 'bg-red-100 text-red-600' :
                                     currentEmotion === 'happy' ? 'bg-yellow-100 text-yellow-700' :
@@ -648,7 +649,7 @@ const ChatPage = () => {
                                 animate={{ opacity: 1, y: 0 }}
                                 className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                             >
-                                <div className={`flex flex-col max-w-[80%] md:max-w-[60%] ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}>
+                                <div className={`flex flex-col max-w-[80%] md:max-w-[70%] ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}>
                                     {msg.sender === 'ai' && (
                                         <span className="text-xs font-bold text-deep-brown/40 mb-2 ml-4">Companion</span>
                                     )}
@@ -664,6 +665,25 @@ const ChatPage = () => {
                                         >
                                             {msg.text}
                                         </ReactMarkdown>
+
+                                        {/* Council Member Buttons */}
+                                        {msg.agent_thoughts && typeof msg.agent_thoughts === 'object' && (
+                                            <div className="mt-6 flex flex-wrap gap-2 pt-4 border-t border-deep-brown/10">
+                                                {Object.entries(msg.agent_thoughts).map(([persona, thought]) => (
+                                                    <button
+                                                        key={persona}
+                                                        onClick={() => setActiveThought({ persona, thought })}
+                                                        className="px-3 py-1.5 bg-white/50 hover:bg-white rounded-lg text-xs font-bold text-deep-brown/80 shadow-sm border border-deep-brown/5 transition-all flex items-center gap-2"
+                                                    >
+                                                        <span>
+                                                            {persona.includes("Stoic") ? "🏛️" :
+                                                                persona.includes("Nurturer") ? "❤️" : "🏆"}
+                                                        </span>
+                                                        {persona}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                     {msg.sender === 'ai' && (
                                         <div className="mt-2 ml-4 p-1.5 bg-white/50 rounded-full w-fit shadow-sm">
@@ -684,17 +704,49 @@ const ChatPage = () => {
                         <div ref={messagesEndRef} />
                     </div>
 
-                    {/* Input Area */}
-                    <div className="p-6 md:p-8 bg-white/40 backdrop-blur-md">
-                        <form onSubmit={sendMessage} className="relative max-w-4xl mx-auto flex items-center">
+                    {/* Input Area + Mode Selector */}
+                    <div className="p-6 md:p-8 bg-white/40 backdrop-blur-md flex flex-col gap-4">
+                        {/* Mode Selector */}
+                        <div className="flex gap-2 mx-auto bg-white/50 p-1 rounded-full border border-white/60 shadow-sm">
+                            {['auto', 'stoic', 'nurturer', 'coach'].map(mode => (
+                                <button
+                                    key={mode}
+                                    onClick={() => setChatMode(mode)}
+                                    className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${chatMode === mode
+                                        ? 'bg-deep-brown text-white shadow-md'
+                                        : 'text-deep-brown/60 hover:bg-white/80'
+                                        }`}
+                                >
+                                    {mode === 'auto' ? '🧠 Council' :
+                                        mode === 'stoic' ? '🏛️ Stoic' :
+                                            mode === 'nurturer' ? '❤️ Nurturer' : '🏆 Coach'}
+                                </button>
+                            ))}
+                        </div>
+
+                        <form onSubmit={sendMessage} className="relative max-w-4xl w-full mx-auto flex items-center">
                             <input
                                 type="text"
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
-                                placeholder="Type your thoughts..."
+                                placeholder={`Message the ${chatMode === 'auto' ? 'Council' : chatMode.charAt(0).toUpperCase() + chatMode.slice(1)}...`}
                                 className="w-full glass-input pr-16 text-lg"
                                 disabled={loading}
                             />
+
+                            {/* Voice Button */}
+                            <button
+                                type="button"
+                                onClick={isListening ? stopListening : startListening}
+                                className={`absolute right-14 p-2 rounded-full transition-all ${isListening
+                                    ? 'bg-red-500 text-white animate-pulse'
+                                    : 'text-deep-brown/40 hover:bg-black/5 hover:text-deep-brown'
+                                    }`}
+                                title="Voice Input"
+                            >
+                                {isListening ? <MicOff size={20} /> : <Mic size={20} />}
+                            </button>
+
                             <button
                                 type="submit"
                                 disabled={loading}
@@ -706,6 +758,63 @@ const ChatPage = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Active Thought Modal */}
+            <AnimatePresence>
+                {activeThought && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setActiveThought(null)}
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, y: 20 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.9, y: 20 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden"
+                        >
+                            <div className={`p-6 ${activeThought.persona.includes("Stoic") ? "bg-stone-200" :
+                                activeThought.persona.includes("Nurturer") ? "bg-rose-100" :
+                                    "bg-amber-100"
+                                }`}>
+                                <h3 className="text-xl font-bold text-deep-brown flex items-center gap-2">
+                                    <span>
+                                        {activeThought.persona.includes("Stoic") ? "🏛️" :
+                                            activeThought.persona.includes("Nurturer") ? "❤️" : "🏆"}
+                                    </span>
+                                    {activeThought.persona}
+                                </h3>
+                            </div>
+                            <div className="p-8">
+                                <p className="text-lg leading-relaxed text-deep-brown/80 font-medium italic">
+                                    "{activeThought.thought}"
+                                </p>
+                                <button
+                                    onClick={() => setActiveThought(null)}
+                                    className="mt-8 w-full py-3 bg-deep-brown text-white rounded-xl font-bold hover:bg-deep-brown/90 transition-colors"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Neural Constellation Overlay */}
+            {showGraph && <BrainGraph graphData={graphData} />}
+
+            {/* Quantum Canvas (Music) */}
+            <AmbientSynth emotion={currentEmotion} />
+
+            {/* Blockchain Anchor */}
+            {showAnchor && <TruthAnchor onClose={() => setShowAnchor(false)} />}
+
+            {/* Face Emotion Sensor */}
+            <FaceSensor onEmotionChange={setFaceEmotion} />
         </>
     );
 };

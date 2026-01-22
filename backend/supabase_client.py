@@ -1,5 +1,5 @@
-
 import os
+import json
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from pathlib import Path
@@ -127,9 +127,11 @@ def create_chat_in_db(user_id: str, title: str):
             "messages": [],
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat()
-        }).select().single().execute()
+        }).execute()
         
-        return response.data
+        if response.data and len(response.data) > 0:
+            return response.data[0]
+        return None
     except Exception as e:
         print(f"Error creating chat: {e}")
         return None
@@ -179,3 +181,52 @@ def rename_chat_in_db(chat_id: str, new_title: str):
     except Exception as e:
         print(f"Error renaming chat: {e}")
         return False
+
+def update_user_risk_score(user_id: str, score: int, email: str = None):
+    """
+    Updates the user's risk score in Supabase.
+    """
+    if not supabase:
+        print("Supabase client not initialized. Cannot update risk score.")
+        return
+    
+    try:
+        # 1. Try to fetch email from Supabase 'profiles' table if not provided
+        user_email = email or "unknown@example.com"
+        if not email:
+            try:
+                res = supabase.table("profiles").select("email").eq("id", user_id).single().execute()
+                if res.data and res.data.get("email"):
+                    user_email = res.data["email"]
+            except Exception:
+                pass
+
+        from datetime import datetime
+        data = {
+            "user_id": user_id,
+            "email": user_email,
+            "risk_score": score,
+            "last_updated": datetime.now().isoformat()
+        }
+        
+        # Upsert to Supabase
+        supabase.table("user_risk").upsert(data).execute()
+        print(f"Updated risk score for {user_id}: {score} (Supabase)")
+        
+    except Exception as e:
+        print(f"Error updating risk score in Supabase: {e}")
+
+def get_all_users_risk():
+    """
+    Fetches all users and their risk scores from Supabase.
+    """
+    if not supabase:
+        print("Supabase client not initialized.")
+        return []
+    
+    try:
+        response = supabase.table("user_risk").select("*").execute()
+        return response.data if response.data else []
+    except Exception as e:
+        print(f"Error fetching user risks from Supabase: {e}")
+        return []

@@ -3,7 +3,10 @@ uvicorn
 python-multipart
 python-dotenv
 langchain-community
+langchain-groq
+langchain-huggingface
 langchain-google-genai
+sentence-transformers
 requests
 huggingface_hub
 supabase
