@@ -55,14 +55,24 @@ const useVoice = () => {
 
         const utterance = new SpeechSynthesisUtterance(text);
 
-        // Select a pleasant voice if available
+        // Select the most human-like voice available
         const voices = synthesisRef.current.getVoices();
-        // Try to find a "Google US English" or similar high-quality voice
-        const preferredVoice = voices.find(v => v.name.includes("Google US English") || v.name.includes("Samantha"));
-        if (preferredVoice) utterance.voice = preferredVoice;
+        
+        // Priority list for better voices
+        const preferredVoice = voices.find(v => 
+            v.name.includes("Google US English") || 
+            v.name.includes("Samantha") ||
+            (v.name.includes("Natural") && v.lang.startsWith("en")) ||
+            (v.name.includes("Enhanced") && v.lang.startsWith("en"))
+        );
 
-        utterance.rate = 1.0;
-        utterance.pitch = 1.0;
+        if (preferredVoice) {
+            utterance.voice = preferredVoice;
+        }
+
+        // Slight adjustments for natural flow
+        utterance.rate = 1.0; 
+        utterance.pitch = 1.0; 
 
         utterance.onstart = () => setIsSpeaking(true);
         utterance.onend = () => setIsSpeaking(false);

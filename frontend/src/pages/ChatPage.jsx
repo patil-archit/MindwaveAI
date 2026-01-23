@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Menu, Plus, User, Sparkles, Smile, Frown, Zap, HelpCircle, AlertCircle, Trash2, Edit2, Search, Network, Link as LinkIcon, Volume2, VolumeX } from 'lucide-react';
+import { Send, Menu, Plus, User, Sparkles, Smile, Frown, Zap, HelpCircle, AlertCircle, Trash2, Edit2, Search, Network, Link as LinkIcon, Volume2, VolumeX, Database, Wind, Video } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -30,7 +30,7 @@ const ChatPage = () => {
     const [currentChatId, setCurrentChatId] = useState(null);
     const [input, setInput] = useState('');
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-    const [chatMode, setChatMode] = useState('auto'); // 'auto', 'stoic', 'nurturer', 'coach'
+    const [chatMode, setChatMode] = useState('auto'); // 'auto', 'logic', 'support', 'motivation'
     const [currentEmotion, setCurrentEmotion] = useState('neutral');
     const [showGraph, setShowGraph] = useState(false);
     const [showAnchor, setShowAnchor] = useState(false);
@@ -533,6 +533,55 @@ const ChatPage = () => {
                                 <span>Memory Vault</span>
                             </Link>
 
+                            <button
+                                onClick={() => setShowGraph(!showGraph)}
+                                className={`flex items-center gap-3 w-full p-4 mb-2 rounded-3xl transition-all font-semibold border ${showGraph
+                                    ? 'bg-uprock-orange text-white border-uprock-orange'
+                                    : 'bg-white/50 border-deep-brown/5 text-deep-brown hover:bg-white/80'}`}
+                            >
+                                <Network size={20} className={showGraph ? "text-white" : "text-deep-brown"} />
+                                <span>Neural Graph</span>
+                            </button>
+
+                            <Link
+                                to="/insights"
+                                className="flex items-center gap-3 w-full p-4 mb-2 rounded-3xl bg-purple-100/50 hover:bg-purple-100 transition-all text-deep-brown font-semibold border border-purple-200/50"
+                            >
+                                <Zap size={20} className="text-purple-600" />
+                                <span>Insight Dashboard</span>
+                            </Link>
+
+                            <Link
+                                to="/focus"
+                                className="flex items-center gap-3 w-full p-4 mb-2 rounded-3xl bg-teal-100/50 hover:bg-teal-100 transition-all text-deep-brown font-semibold border border-teal-200/50"
+                            >
+                                <Wind size={20} className="text-teal-600" />
+                                <span>Focus Sanctuary</span>
+                            </Link>
+
+                            <Link
+                                to="/video-session"
+                                className="flex items-center gap-3 w-full p-4 mb-2 rounded-3xl bg-red-100/50 hover:bg-red-100 transition-all text-deep-brown font-semibold border border-red-200/50"
+                            >
+                                <Video size={20} className="text-red-500" />
+                                <span>3D Video Counselor</span>
+                            </Link>
+
+                            <button
+                                onClick={async () => {
+                                    if (confirm("Generate demo data for your account? This will add chats to your history.")) {
+                                        try {
+                                            await fetch(`${API_BASE_URL}/seed/${currentUser.uid}`, { method: 'POST' });
+                                            alert("Seeding started! Give it a moment and then check your Graph.");
+                                        } catch (e) { alert("Error seeding: " + e.message); }
+                                    }
+                                }}
+                                className="flex items-center gap-3 w-full p-4 mb-6 rounded-3xl bg-blue-100/50 hover:bg-blue-100 transition-all text-deep-brown font-semibold border border-blue-200/50"
+                            >
+                                <Database size={20} className="text-blue-500" />
+                                <span>Seed Demo Data</span>
+                            </button>
+
                             <div className="flex-1 overflow-y-auto space-y-2 pr-2">
                                 {chats.map(chat => (
                                     <div
@@ -595,13 +644,9 @@ const ChatPage = () => {
                                 <Menu size={24} className="text-deep-brown" />
                             </button>
                             <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => setShowGraph(!showGraph)}
-                                    className={`p-2 rounded-full transition-colors ${showGraph ? 'bg-uprock-orange text-white' : 'hover:bg-deep-brown/10 text-deep-brown'}`}
-                                    title="Toggle Neural Constellation"
-                                >
-                                    <Network size={20} />
-                                </button>
+
+
+
                                 <button
                                     onClick={() => setShowAnchor(true)}
                                     className="p-2 rounded-full hover:bg-deep-brown/10 text-deep-brown transition-colors"
@@ -676,8 +721,8 @@ const ChatPage = () => {
                                                         className="px-3 py-1.5 bg-white/50 hover:bg-white rounded-lg text-xs font-bold text-deep-brown/80 shadow-sm border border-deep-brown/5 transition-all flex items-center gap-2"
                                                     >
                                                         <span>
-                                                            {persona.includes("Stoic") ? "🏛️" :
-                                                                persona.includes("Nurturer") ? "❤️" : "🏆"}
+                                                            {persona.includes("Logic") ? "🏛️" :
+                                                                persona.includes("Support") ? "❤️" : "🏆"}
                                                         </span>
                                                         {persona}
                                                     </button>
@@ -708,7 +753,7 @@ const ChatPage = () => {
                     <div className="p-6 md:p-8 bg-white/40 backdrop-blur-md flex flex-col gap-4">
                         {/* Mode Selector */}
                         <div className="flex gap-2 mx-auto bg-white/50 p-1 rounded-full border border-white/60 shadow-sm">
-                            {['auto', 'stoic', 'nurturer', 'coach'].map(mode => (
+                            {['auto', 'logic', 'support', 'motivation'].map(mode => (
                                 <button
                                     key={mode}
                                     onClick={() => setChatMode(mode)}
@@ -718,8 +763,8 @@ const ChatPage = () => {
                                         }`}
                                 >
                                     {mode === 'auto' ? '🧠 Council' :
-                                        mode === 'stoic' ? '🏛️ Stoic' :
-                                            mode === 'nurturer' ? '❤️ Nurturer' : '🏆 Coach'}
+                                        mode === 'logic' ? '🏛️ Logic' :
+                                            mode === 'support' ? '❤️ Support' : '🏆 Motivation'}
                                 </button>
                             ))}
                         </div>
@@ -776,14 +821,14 @@ const ChatPage = () => {
                             onClick={(e) => e.stopPropagation()}
                             className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden"
                         >
-                            <div className={`p-6 ${activeThought.persona.includes("Stoic") ? "bg-stone-200" :
-                                activeThought.persona.includes("Nurturer") ? "bg-rose-100" :
+                            <div className={`p-6 ${activeThought.persona.includes("Logic") ? "bg-stone-200" :
+                                activeThought.persona.includes("Support") ? "bg-rose-100" :
                                     "bg-amber-100"
                                 }`}>
                                 <h3 className="text-xl font-bold text-deep-brown flex items-center gap-2">
                                     <span>
-                                        {activeThought.persona.includes("Stoic") ? "🏛️" :
-                                            activeThought.persona.includes("Nurturer") ? "❤️" : "🏆"}
+                                        {activeThought.persona.includes("Logic") ? "🏛️" :
+                                            activeThought.persona.includes("Support") ? "❤️" : "🏆"}
                                     </span>
                                     {activeThought.persona}
                                 </h3>
@@ -805,7 +850,30 @@ const ChatPage = () => {
             </AnimatePresence>
 
             {/* Neural Constellation Overlay */}
-            {showGraph && <BrainGraph graphData={graphData} />}
+            {/* Neural Constellation Overlay */}
+            <AnimatePresence>
+                {showGraph && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4"
+                    >
+                        <div className="w-full h-full max-w-7xl max-h-[95vh] relative bg-black rounded-3xl overflow-hidden shadow-2xl border border-uprock-orange/20 glow-border">
+                            {/* Close Button */}
+                            <button
+                                onClick={() => setShowGraph(false)}
+                                className="absolute top-6 right-6 z-[110] p-3 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-all border border-white/10"
+                            >
+                                <VolumeX className="rotate-45" size={24} />
+                            </button>
+
+                            {/* Graph Component */}
+                            <BrainGraph graphData={graphData} />
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Quantum Canvas (Music) */}
             <AmbientSynth emotion={currentEmotion} />

@@ -107,6 +107,26 @@ const AmbientSynth = ({ emotion = 'neutral' }) => {
 
     }, [emotion]);
 
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (synthRef.current) {
+                synthRef.current.dispose();
+                synthRef.current = null;
+            }
+            if (loopRef.current) {
+                loopRef.current.dispose();
+                loopRef.current = null;
+            }
+            if (reverbRef.current) {
+                reverbRef.current.dispose();
+                reverbRef.current = null;
+            }
+            Tone.Transport.stop();
+            Tone.Transport.cancel(); // Clear all scheduled events
+        };
+    }, []);
+
     return (
         <div className="fixed bottom-4 left-4 z-50">
             <button

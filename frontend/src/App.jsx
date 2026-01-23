@@ -11,6 +11,9 @@ import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import MemorySearchPage from './pages/MemorySearchPage';
 import PhysicalDataPage from './pages/PhysicalDataPage';
+import InsightDashboard from './pages/InsightDashboard';
+import FocusPage from './pages/FocusPage';
+import VideoCounselor from './pages/VideoCounselor';
 import PrivateRoute from './components/PrivateRoute';
 import { AuthProvider } from './context/AuthContext';
 
@@ -44,6 +47,21 @@ function App() {
             <Route path="/physical-health" element={
               <PrivateRoute>
                 <PhysicalDataPage />
+              </PrivateRoute>
+            } />
+            <Route path="/insights" element={
+              <PrivateRoute>
+                <InsightDashboard />
+              </PrivateRoute>
+            } />
+            <Route path="/focus" element={
+              <PrivateRoute>
+                <FocusPage />
+              </PrivateRoute>
+            } />
+            <Route path="/video-session" element={
+              <PrivateRoute>
+                <VideoCounselor />
               </PrivateRoute>
             } />
           </Routes>

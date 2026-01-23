@@ -1,4 +1,460 @@
 {
-  "nodes": [],
-  "links": []
+  "nodes": [
+    {
+      "id": "I",
+      "group": "Person"
+    },
+    {
+      "id": "Final Year Project",
+      "group": "Event"
+    },
+    {
+      "id": "Overwhelm",
+      "group": "Emotion"
+    },
+    {
+      "id": "Deadline",
+      "group": "Event"
+    },
+    {
+      "id": "Software Engineer",
+      "group": "Concept"
+    },
+    {
+      "id": "Doubt",
+      "group": "Emotion"
+    },
+    {
+      "id": "Coding Skills",
+      "group": "Concept"
+    },
+    {
+      "id": "Peers",
+      "group": "Person"
+    },
+    {
+      "id": "Professor",
+      "group": "Person"
+    },
+    {
+      "id": "Project",
+      "group": "Concept"
+    },
+    {
+      "id": "Confidence",
+      "group": "Emotion"
+    },
+    {
+      "id": "Night",
+      "group": "Time"
+    },
+    {
+      "id": "React code",
+      "group": "Concept"
+    },
+    {
+      "id": "Feeling",
+      "group": "Emotion"
+    },
+    {
+      "id": "Product Management",
+      "group": "Concept"
+    },
+    {
+      "id": "strategy",
+      "group": "Concept"
+    },
+    {
+      "id": "coding",
+      "group": "Concept"
+    },
+    {
+      "id": "Girlfriend",
+      "group": "Person"
+    },
+    {
+      "id": "Me",
+      "group": "Person"
+    },
+    {
+      "id": "Breakup",
+      "group": "Event"
+    },
+    {
+      "id": "Work",
+      "group": "Concept"
+    },
+    {
+      "id": "Yesterday",
+      "group": "Time"
+    },
+    {
+      "id": "lonely",
+      "group": "Emotion"
+    },
+    {
+      "id": "city",
+      "group": "Place"
+    },
+    {
+      "id": "Everyone",
+      "group": "Person"
+    },
+    {
+      "id": "Family",
+      "group": "People"
+    },
+    {
+      "id": "Home",
+      "group": "Place"
+    },
+    {
+      "id": "Mom",
+      "group": "Person"
+    },
+    {
+      "id": "Cooking",
+      "group": "Concept"
+    },
+    {
+      "id": "Happiness",
+      "group": "Emotion"
+    },
+    {
+      "id": "Luna",
+      "group": "Pet"
+    },
+    {
+      "id": "Anxiety",
+      "group": "Emotion"
+    },
+    {
+      "id": "Presentation",
+      "group": "Event"
+    },
+    {
+      "id": "Crowd",
+      "group": "Place"
+    },
+    {
+      "id": "Meditation",
+      "group": "Concept"
+    },
+    {
+      "id": "run",
+      "group": "Event"
+    },
+    {
+      "id": "today",
+      "group": "Time"
+    },
+    {
+      "id": "invincible",
+      "group": "Emotion"
+    },
+    {
+      "id": "Sleep",
+      "group": "Concept"
+    },
+    {
+      "id": "Mood",
+      "group": "Emotion"
+    },
+    {
+      "id": "Day",
+      "group": "Event"
+    },
+    {
+      "id": "Fear",
+      "group": "Emotion"
+    },
+    {
+      "id": "Failing",
+      "group": "Event"
+    },
+    {
+      "id": "Success",
+      "group": "Concept"
+    },
+    {
+      "id": "Motivation",
+      "group": "Emotion"
+    },
+    {
+      "id": "Gym Routine",
+      "group": "Activity"
+    },
+    {
+      "id": "Listener",
+      "group": "Person"
+    },
+    {
+      "id": "Advice",
+      "group": "Concept"
+    },
+    {
+      "id": "VirtualHug",
+      "group": "Concept"
+    },
+    {
+      "id": "User",
+      "group": "Person"
+    },
+    {
+      "id": "EmotionalSupport",
+      "group": "Concept"
+    }
+  ],
+  "links": [
+    {
+      "source": "I",
+      "target": "Overwhelm",
+      "label": "feeling"
+    },
+    {
+      "source": "Final Year Project",
+      "target": "I",
+      "label": "causes"
+    },
+    {
+      "source": "Deadline",
+      "target": "Final Year Project",
+      "label": "associated with"
+    },
+    {
+      "source": "I",
+      "target": "Software Engineer",
+      "label": "wants to be"
+    },
+    {
+      "source": "I",
+      "target": "Doubt",
+      "label": "feels"
+    },
+    {
+      "source": "Doubt",
+      "target": "Coding Skills",
+      "label": "about"
+    },
+    {
+      "source": "I",
+      "target": "Coding Skills",
+      "label": "compares"
+    },
+    {
+      "source": "Coding Skills",
+      "target": "Peers",
+      "label": "to"
+    },
+    {
+      "source": "Professor",
+      "target": "Project",
+      "label": "criticized"
+    },
+    {
+      "source": "Project",
+      "target": "Confidence",
+      "label": "crushed"
+    },
+    {
+      "source": "I",
+      "target": "React code",
+      "label": "debugged"
+    },
+    {
+      "source": "I",
+      "target": "Night",
+      "label": "stayed up all"
+    },
+    {
+      "source": "I",
+      "target": "Feeling",
+      "label": "felt"
+    },
+    {
+      "source": "React code",
+      "target": "Feeling",
+      "label": "causes"
+    },
+    {
+      "source": "I",
+      "target": "Product Management",
+      "label": "considering"
+    },
+    {
+      "source": "I",
+      "target": "strategy",
+      "label": "likes"
+    },
+    {
+      "source": "I",
+      "target": "coding",
+      "label": "prefers less"
+    },
+    {
+      "source": "Girlfriend",
+      "target": "Me",
+      "label": "broke up with"
+    },
+    {
+      "source": "Me",
+      "target": "Work",
+      "label": "spends too much time on"
+    },
+    {
+      "source": "Work",
+      "target": "Breakup",
+      "label": "causes"
+    },
+    {
+      "source": "Breakup",
+      "target": "Yesterday",
+      "label": "happened on"
+    },
+    {
+      "source": "I",
+      "target": "lonely",
+      "label": "feels"
+    },
+    {
+      "source": "I",
+      "target": "city",
+      "label": "in"
+    },
+    {
+      "source": "Everyone",
+      "target": "city",
+      "label": "in"
+    },
+    {
+      "source": "I",
+      "target": "Family",
+      "label": "miss"
+    },
+    {
+      "source": "I",
+      "target": "Home",
+      "label": "back to"
+    },
+    {
+      "source": "Mom",
+      "target": "Cooking",
+      "label": "makes"
+    },
+    {
+      "source": "Cooking",
+      "target": "Happiness",
+      "label": "causes"
+    },
+    {
+      "source": "I",
+      "target": "Happiness",
+      "label": "feels"
+    },
+    {
+      "source": "I",
+      "target": "Luna",
+      "label": "adopted"
+    },
+    {
+      "source": "Luna",
+      "target": "I",
+      "label": "calms"
+    },
+    {
+      "source": "Luna",
+      "target": "Anxiety",
+      "label": "reduces"
+    },
+    {
+      "source": "I",
+      "target": "Anxiety",
+      "label": "experiences"
+    },
+    {
+      "source": "Presentation",
+      "target": "I",
+      "label": "causes"
+    },
+    {
+      "source": "I",
+      "target": "Presentation",
+      "label": "presents to"
+    },
+    {
+      "source": "Presentation",
+      "target": "Crowd",
+      "label": "in front of"
+    },
+    {
+      "source": "Meditation",
+      "target": "Anxiety",
+      "label": "helps with"
+    },
+    {
+      "source": "I",
+      "target": "run",
+      "label": "went for"
+    },
+    {
+      "source": "I",
+      "target": "invincible",
+      "label": "feels"
+    },
+    {
+      "source": "Sleep",
+      "target": "Mood",
+      "label": "affects"
+    },
+    {
+      "source": "Sleep",
+      "target": "Day",
+      "label": "impacts"
+    },
+    {
+      "source": "I",
+      "target": "Fear",
+      "label": "experiences"
+    },
+    {
+      "source": "Fear",
+      "target": "Failing",
+      "label": "causes"
+    },
+    {
+      "source": "I",
+      "target": "Success",
+      "label": "seeks"
+    },
+    {
+      "source": "I",
+      "target": "Motivation",
+      "label": "needs"
+    },
+    {
+      "source": "Motivation",
+      "target": "Gym Routine",
+      "label": "to start"
+    },
+    {
+      "source": "User",
+      "target": "Listener",
+      "label": "needs"
+    },
+    {
+      "source": "User",
+      "target": "VirtualHug",
+      "label": "requests"
+    },
+    {
+      "source": "User",
+      "target": "Advice",
+      "label": "rejects"
+    },
+    {
+      "source": "VirtualHug",
+      "target": "EmotionalSupport",
+      "label": "provides"
+    }
+  ]
 }

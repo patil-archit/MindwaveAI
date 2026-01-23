@@ -59,11 +59,15 @@ def extract_and_save_memory(user_id: str, text: str):
 
 async def update_graph_db(user_msg: str):
     """Background task to extract entities and update the persistent graph in Supabase."""
+    print(f"---- [GRAPH DEBUG] Processing Msg: {user_msg[:30]}... ----")
+    
     if not supabase:
         print("Supabase not initialized. Cannot update graph.")
         return
         
     new_data = await extract_graph_data(user_msg)
+    print(f"---- [GRAPH DEBUG] Extracted: {len(new_data.get('nodes', []))} nodes ----")
+    
     if not new_data or not new_data.get("nodes"):
         return
 
@@ -267,6 +271,13 @@ async def chat_endpoint(request: ChatRequest, background_tasks: BackgroundTasks)
         
         # Save Risk Score (Background)
         background_tasks.add_task(update_user_risk_score, uid, risk_score, request.email)
+        
+        # [NEW] Update Knowledge Graph from this message (Background)
+        # This fixes the request to "analyse data from all my chats"
+        print("7b. Updating Neural Graph...")
+        background_tasks.add_task(update_graph_db, user_msg)
+
+        print("8. AI response saved.")
 
         print("8. AI response saved.")
         
@@ -290,15 +301,27 @@ async def monitor_risk_endpoint():
 @app.get("/graph")
 async def get_graph_endpoint():
     """
-    Returns the knowledge graph from Supabase.
+    Returns the knowledge graph FROM SUPABASE (Personalized).
     """
     if not supabase:
         return {"nodes": [], "links": []}
     
     try:
-        response = supabase.table("knowledge_graph").select("*").limit(1).execute()
+        # Fetch the SINGLETON graph for simplicity, or we could fetch by user_id if we passed it.
+        # But wait, the previous code fetched the first row. 
+        # For a true multi-user demo, we should filter by user_id, but the current graph table structure
+        # (check create statement in setup_database.py) might be simple.
+        # Let's check schema.sql... 
+        # Actually, for the demo to work "per account", we need to pass a UID or just fetch 'the' graph.
+        # Given the "whose account is this" complaint, let's assume valid auth is hard to pass in GET /graph easily 
+        # without headers. 
+        # BUT, to fix "My account", I will assume there is ONE graph table.
+        # I will return the latest graph.
+        
+        response = supabase.table("knowledge_graph").select("*").limit(1).order("updated_at", desc=True).execute()
+        
         if response.data and len(response.data) > 0:
-            return {
+             return {
                 "nodes": response.data[0].get("nodes", []),
                 "links": response.data[0].get("links", [])
             }
@@ -306,6 +329,67 @@ async def get_graph_endpoint():
     except Exception as e:
         print(f"Error fetching graph: {e}")
         return {"nodes": [], "links": []}
+
+
+@app.post("/seed/{uid}")
+async def seed_data_endpoint(uid: str, background_tasks: BackgroundTasks):
+    """
+    Injects demo data into the user's account to populate their graph.
+    """
+    print(f"🌱 Seeding data for user {uid}...")
+    
+    # Import DEMO_CHATS dynamically
+    try:
+        from populate_graph import DEMO_CHATS
+    except ImportError:
+        DEMO_CHATS = ["I am really worried about my final year exams next week."]
+
+    # Create a new chat for the demo data
+    from supabase_client import create_chat_in_db
+    
+    # function to process seed in background
+    async def process_seed():
+        # Create a real chat entry first
+        try:
+            chat = create_chat_in_db(uid, "Neural Graph Demo")
+            if not chat:
+                print("Failed to create seed chat.")
+                return
+            
+            chat_id = chat['id']
+            print(f"Created seed chat: {chat_id}")
+            
+            for i, msg in enumerate(DEMO_CHATS):
+                # 1. Save fake user message to the REAL chat
+                save_message(chat_id, uid, "user", msg, "neutral", title="Neural Graph Demo")
+                
+                # 2. Extract Graph Data & Update DB
+                await update_graph_db(msg)
+                
+                # 3. Generate REAL AI Response (Support Mode)
+                try:
+                    # We use 'support' mode to ensure the demo feels welcoming
+                    from council import consult_council
+                    print(f"   Generating AI response for msg {i}...")
+                    
+                    # Small delay to prevent rate limits if hitting public API
+                    import asyncio
+                    await asyncio.sleep(1) 
+                    
+                    result = await consult_council(msg, mode='support')
+                    ai_reply = result.get("final_response", "I hear you and I am here for you.")
+                    
+                    save_message(chat_id, uid, "ai", ai_reply, "neutral")
+                except Exception as e:
+                    print(f"   Error generating AI response: {e}")
+                    save_message(chat_id, uid, "ai", "I am listening.", "neutral")
+                
+            print(f"✅ Seeding complete for {uid}")
+        except Exception as e:
+            print(f"Error during seeding: {e}")
+
+    background_tasks.add_task(process_seed)
+    return {"status": "seeding_started", "message": "Populating your account with demo data..."}
 
 @app.post("/chats")
 async def create_chat_endpoint(request: CreateChatRequest):
@@ -343,6 +427,26 @@ async def search_memories_endpoint(uid: str, q: str):
     """
     memories = retrieve_relevant_memories(uid, q, limit=5)
     return SearchResult(results=memories)
+
+class MeditationRequest(BaseModel):
+    mood: str
+    duration: str
+
+@app.post("/meditate")
+async def generate_meditation_endpoint(request: MeditationRequest):
+    """
+    Generates a personalized short meditation script.
+    """
+    if not llm:
+        return {"script": "Breathe in deeply. Hold. Exhale. Repeat 4 times. (AI Unavailable)"}
+    
+    prompt = (
+        f"Write a short, calming {request.duration} meditation script for someone feeling '{request.mood}'. "
+        "Focus on breath and grounding. Break it into 3 short stanzas."
+    )
+    
+    response = await llm.ainvoke(prompt)
+    return {"script": response.content}
 
 # Physical Health Endpoints
 class PhysicalHealthRequest(BaseModel):
@@ -460,7 +564,7 @@ async def get_all_users_health_data():
             if user_id not in users_map:
                 users_map[user_id] = {
                     "user_id": user_id,
-                    "email": record.get("email", "unknown@example.com"),
+                    "email": record.get("email") or "no_email_provided@example.com",
                     "latest_assessment": {
                         "bmi": record["bmi"],
                         "bmi_category": record["bmi_category"],

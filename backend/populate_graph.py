@@ -12,12 +12,29 @@ from pathlib import Path
 GRAPH_FILE = Path(__file__).parent / "graph_db.json"
 
 DEMO_CHATS = [
-    "I am really worried about my final year exams next week.",
-    "My dad is pressuring me to get a high paying job, but I love coding.",
-    "I feel happy when I listen to jazz music, it calms my anxiety.",
-    "The hackathon in San Francisco was amazing, I met so many founders.",
-    "Coffee makes me jittery but I need it for studying.",
-    "I want to build a startup called Mindwave to help people with depression."
+    # Academic Stress & Career (Interconnected)
+    "I'm feeling overwhelmed by my final year project. The deadline is in 2 weeks.",
+    "I want to be a software engineer but I doubt my coding skills compared to my peers.",
+    "My professor said my project architecture is weak, which crushed my confidence.",
+    "I stayed up all night debugging React code, but it felt good to finally fix it.",
+    "Maybe I should switch to Product Management? I like the strategy part more than coding.",
+
+    # Personal Life & Relationships
+    "My girlfriend broke up with me yesterday because I spend too much time working.",
+    "I feel lonely in this big city. Everyone is always busy.",
+    "I miss my family back home. Mom's cooking always cheered me up.",
+    "I adopted a cat named Luna today! She's so fluffy and calming.",
+    
+    # Emotional Patterns
+    "I get anxious whenever I have to present in front of a crowd.",
+    "Meditation has been helping significantly with my morning anxiety.",
+    "I went for a 5k run today and I feel invincible!",
+    "Sleeping only 4 hours a night is ruining my mood during the day.",
+    
+    # Specific Mindwave Features
+    "I'm scared of failing. What if I never succeed?",
+    "I need motivation to start my gym routine again.",
+    "Can you just listen? I don't need advice, just a virtual hug right now."
 ]
 
 async def populate():
