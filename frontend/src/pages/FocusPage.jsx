@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Wind, Play, Pause, RefreshCw, Volume2, ArrowLeft, CloudRain, Trees, Waves } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -12,12 +12,12 @@ const FocusPage = () => {
     const [activeSound, setActiveSound] = useState(null);
     const audioRef = React.useRef(new Audio());
 
-    React.useEffect(() => {
+    useEffect(() => {
         // Sound Library (Public Domain / CC0)
         const SOUND_URLS = {
-            'rain': 'https://cdn.pixabay.com/download/audio/2022/07/04/audio_97f4fa1103.mp3?filename=heavy-rain-nature-sounds-8178.mp3',
-            'forest': 'https://cdn.pixabay.com/download/audio/2021/09/06/audio_343606f234.mp3?filename=forest-birds-10803.mp3',
-            'waves': 'https://cdn.pixabay.com/download/audio/2022/02/11/audio_731307b0ba.mp3?filename=ocean-waves-11100.mp3'
+            'rain': 'https://actions.google.com/sounds/v1/weather/rain_heavy_loud.ogg',
+            'forest': 'https://actions.google.com/sounds/v1/ambiences/forest_morning.ogg',
+            'waves': 'https://actions.google.com/sounds/v1/water/waves_crashing.ogg'
         };
 
         const audio = audioRef.current;
@@ -36,6 +36,45 @@ const FocusPage = () => {
             audio.pause();
         };
     }, [activeSound]);
+
+    // Breathing Voice Guidance
+    useEffect(() => {
+        let interval;
+        let timeouts = [];
+
+        const speak = (text) => {
+            if (!window.speechSynthesis) return;
+            window.speechSynthesis.cancel(); // Clear queue
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 0.85; // Slow and calming
+            utterance.pitch = 1;
+            // Try to find a good voice
+            const voices = window.speechSynthesis.getVoices();
+            const preferred = voices.find(v => v.name.includes("Google US English") || v.name.includes("Samantha"));
+            if (preferred) utterance.voice = preferred;
+
+            window.speechSynthesis.speak(utterance);
+        };
+
+        if (isBreathing) {
+            const runCycle = () => {
+                speak("Breathe In");
+                timeouts.push(setTimeout(() => speak("Hold"), 4000));
+                timeouts.push(setTimeout(() => speak("Breathe Out"), 11000));
+            };
+
+            runCycle(); // Start immediately
+            interval = setInterval(runCycle, 19000); // 19s cycle (4+7+8)
+        } else {
+            window.speechSynthesis.cancel();
+        }
+
+        return () => {
+            clearInterval(interval);
+            timeouts.forEach(clearTimeout);
+            window.speechSynthesis.cancel();
+        };
+    }, [isBreathing]);
 
     const generateMeditation = async () => {
         setLoading(true);

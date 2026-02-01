@@ -142,6 +142,16 @@ const InsightDashboard = () => {
                         </button>
                     </div>
 
+                    {/* Graph Explanation (New Request) */}
+                    <div className="col-span-1 lg:col-span-2 p-6 bg-blue-50/50 rounded-3xl border border-blue-100">
+                        <h3 className="text-lg font-bold text-deep-brown mb-2">📊 Understanding Your Emotional Velocity</h3>
+                        <p className="text-deep-brown/70 leading-relaxed">
+                            The purple "Emotional Velocity" graph above visualizes the <strong>rate of change</strong> in your emotional state over time.
+                            Peaks indicate moments of high energy or positive breakthrough, while valleys may suggest periods of rest or introspection.
+                            Mindwave uses this to tailor its advice—suggesting calming exercises during high velocity or motivation during lows.
+                        </p>
+                    </div>
+
                 </div>
             </div>
         </div>

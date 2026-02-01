@@ -567,20 +567,7 @@ const ChatPage = () => {
                                 <span>3D Video Counselor</span>
                             </Link>
 
-                            <button
-                                onClick={async () => {
-                                    if (confirm("Generate demo data for your account? This will add chats to your history.")) {
-                                        try {
-                                            await fetch(`${API_BASE_URL}/seed/${currentUser.uid}`, { method: 'POST' });
-                                            alert("Seeding started! Give it a moment and then check your Graph.");
-                                        } catch (e) { alert("Error seeding: " + e.message); }
-                                    }
-                                }}
-                                className="flex items-center gap-3 w-full p-4 mb-6 rounded-3xl bg-blue-100/50 hover:bg-blue-100 transition-all text-deep-brown font-semibold border border-blue-200/50"
-                            >
-                                <Database size={20} className="text-blue-500" />
-                                <span>Seed Demo Data</span>
-                            </button>
+
 
                             <div className="flex-1 overflow-y-auto space-y-2 pr-2">
                                 {chats.map(chat => (

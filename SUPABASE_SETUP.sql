@@ -1,5 +1,50 @@
--- Run this in your Supabase SQL Editor to fix the Neural Graph
+-- Comprehensive Setup for Mindwave AI
+-- Run this in your Supabase SQL Editor.
 
+-- 1. Enable pgvector extension (Required for Memory Vault)
+create extension if not exists vector;
+
+-- 2. Create Memories Table (if not exists)
+create table if not exists memories (
+  id bigserial primary key,
+  user_id text not null,
+  content text not null,
+  embedding vector(768), -- Google Gecko/Check model dimension, usually 768
+  created_at timestamptz default now()
+);
+
+-- 3. Create Vector Search Function (Critical for Memory Agent)
+-- Drop existing function to avoid signature conflicts
+drop function if exists match_memories(vector, double precision, int, text);
+drop function if exists match_memories(vector, float, int, text);
+
+create or replace function match_memories (
+  query_embedding vector(768),
+  match_threshold float,
+  match_count int,
+  p_user_id text
+) returns table (
+  id bigint,
+  content text,
+  similarity float
+)
+language plpgsql
+as $$
+begin
+  return query
+  select
+    memories.id,
+    memories.content,
+    1 - (memories.embedding <=> query_embedding) as similarity
+  from memories
+  where 1 - (memories.embedding <=> query_embedding) > match_threshold
+  and memories.user_id = p_user_id
+  order by memories.embedding <=> query_embedding
+  limit match_count;
+end;
+$$;
+
+-- 4. Create Knowledge Graph Table
 create table if not exists knowledge_graph (
   id bigserial primary key,
   nodes jsonb default '[]'::jsonb,
@@ -7,13 +52,32 @@ create table if not exists knowledge_graph (
   updated_at timestamptz default now()
 );
 
--- Enable Row Level Security (RLS) but allow public access for this demo
+-- 5. Seed Knowledge Graph (So it's not empty)
+-- We check if it's empty first
+do $$
+begin
+  if not exists (select 1 from knowledge_graph) then
+    insert into knowledge_graph (nodes, links)
+    values (
+      '[
+        {"id": "Mindwave", "group": "Core"}, 
+        {"id": "User", "group": "Person"}, 
+        {"id": "Coding", "group": "Skill"}, 
+        {"id": "Future", "group": "Goal"},
+        {"id": "AI Council", "group": "System"}
+      ]'::jsonb,
+      '[
+        {"source": "User", "target": "Coding", "label": "loves"},
+        {"source": "User", "target": "Mindwave", "label": "uses"},
+        {"source": "Mindwave", "target": "AI Council", "label": "powered_by"}
+      ]'::jsonb
+    );
+  end if;
+end $$;
+
+-- 6. Enable Security
+alter table memories enable row level security;
 alter table knowledge_graph enable row level security;
 
-create policy "Allow all access" on knowledge_graph
-for all using (true) with check (true);
-
--- Insert an initial empty graph row if none exists
-insert into knowledge_graph (nodes, links)
-select '[]'::jsonb, '[]'::jsonb
-where not exists (select 1 from knowledge_graph);
+create policy "Allow all access memories" on memories for all using (true) with check (true);
+create policy "Allow all access graph" on knowledge_graph for all using (true) with check (true);

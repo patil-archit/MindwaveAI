@@ -100,7 +100,7 @@ const FaceSensor = ({ onEmotionChange }) => {
                 </div>
 
                 {/* Video Feed */}
-                <div className={`relative overflow-hidden rounded-lg transition-all duration-300 ${showVideo ? 'w-32 h-24' : 'w-0 h-0 opacity-0'
+                <div className={`relative overflow-hidden rounded-lg transition-all duration-300 ${showVideo ? 'w-64 h-48 md:w-80 md:h-60' : 'w-0 h-0 opacity-0'
                     }`}>
                     <video
                         ref={videoRef}

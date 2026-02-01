@@ -78,11 +78,82 @@ const HumanoidAvatar = ({ talking }) => {
 };
 
 // --- Main Page ---
+import * as faceapi from 'face-api.js';
+
+const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+
 const VideoCounselor = () => {
     const [isListening, setIsListening] = useState(false);
     const [aiSpeaking, setAiSpeaking] = useState(false);
     const [transcript, setTranscript] = useState("");
     const [aiResponse, setAiResponse] = useState("Hello. I am here to listen. How are you feeling right now?");
+
+    // Face Detection State
+    const webcamRef = useRef(null);
+    const [emotion, setEmotion] = useState('neutral');
+    const [stressLevel, setStressLevel] = useState(20); // 0-100
+    const [modelsLoaded, setModelsLoaded] = useState(false);
+
+    // Load Models
+    useEffect(() => {
+        const loadModels = async () => {
+            try {
+                await Promise.all([
+                    faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+                    faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL)
+                ]);
+                setModelsLoaded(true);
+            } catch (e) {
+                console.error("Model load failed", e);
+            }
+        };
+        loadModels();
+    }, []);
+
+    // Detection Loop
+    useEffect(() => {
+        if (!modelsLoaded) return;
+
+        const interval = setInterval(async () => {
+            if (webcamRef.current && webcamRef.current.video && webcamRef.current.video.readyState === 4) {
+                const video = webcamRef.current.video;
+                try {
+                    const detections = await faceapi
+                        .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+                        .withFaceExpressions();
+
+                    if (detections.length > 0) {
+                        const expressions = detections[0].expressions;
+                        // Find dominant emotion
+                        const dominant = Object.keys(expressions).reduce((a, b) => expressions[a] > expressions[b] ? a : b);
+                        setEmotion(dominant);
+
+                        // Calculate Stress (Angry/Fear/Sad/Disgusted = High Stress)
+                        // Happy/Neutral/Surprised = Low Stress
+                        const stressMap = {
+                            angry: 90,
+                            fearful: 85,
+                            disgusted: 80,
+                            sad: 70,
+                            surprised: 40,
+                            neutral: 20,
+                            happy: 10
+                        };
+
+                        // Smooth transition
+                        setStressLevel(prev => {
+                            const target = stressMap[dominant] || 30;
+                            return prev + (target - prev) * 0.1;
+                        });
+                    }
+                } catch (e) {
+                    // ignore frame errors
+                }
+            }
+        }, 500); // 2Hz check
+
+        return () => clearInterval(interval);
+    }, [modelsLoaded]);
 
     // Quick TTS Function - Optimized for Human Tone
     const speak = (text) => {
@@ -125,7 +196,6 @@ const VideoCounselor = () => {
         }
     }, []);
 
-    // ... rest of logic ...
 
     // Mock Interaction (Since we don't have real STT backend set up in this specific file yet)
     const toggleListening = () => {
@@ -153,7 +223,8 @@ const VideoCounselor = () => {
                     message: text,
                     uid: "user_video_session", // In real app, use AuthContext
                     chat_id: videoChatId,
-                    mode: "video" // Use a video mode if supported, or just auto
+                    mode: "video", // Use a video mode if supported, or just auto
+                    face_emotion: emotion // Pass real emotion
                 })
             });
 
@@ -210,12 +281,14 @@ const VideoCounselor = () => {
                 {/* Webcam Feed */}
                 <div className="relative aspect-video bg-[#FDFBF7] m-6 rounded-3xl overflow-hidden border border-[#4A3728]/10 shadow-inner">
                     <Webcam
+                        ref={webcamRef}
                         audio={false}
                         className="w-full h-full object-cover transform scale-x-[-1] opacity-90"
                     />
                     <div className="absolute top-3 right-3 flex gap-2">
-                        <div className="bg-[#E94E1B]/90 text-white text-[10px] px-2 py-1 rounded-full backdrop-blur-md font-bold shadow-sm">
-                            EMOTION ANALYSIS ACTIVE
+                        <div className={`text-[10px] px-2 py-1 rounded-full backdrop-blur-md font-bold shadow-sm ${emotion === 'neutral' || emotion === 'happy' ? 'bg-green-500/90 text-white' : 'bg-red-500/90 text-white'
+                            }`}>
+                            {emotion.toUpperCase()} ACTIVE
                         </div>
                     </div>
                 </div>
@@ -227,10 +300,15 @@ const VideoCounselor = () => {
                         <div>
                             <div className="flex justify-between text-sm text-[#4A3728] font-medium mb-2">
                                 <span>Stress Level</span>
-                                <span className="text-green-600">Low</span>
+                                <span className={stressLevel > 60 ? "text-red-600" : "text-green-600"}>
+                                    {Math.round(stressLevel)}%
+                                </span>
                             </div>
                             <div className="h-2 w-full bg-[#4A3728]/5 rounded-full overflow-hidden">
-                                <div className="h-full bg-green-500 w-[30%] rounded-full" />
+                                <motion.div
+                                    animate={{ width: `${stressLevel}%` }}
+                                    className={`h-full rounded-full ${stressLevel > 60 ? 'bg-red-500' : 'bg-green-500'}`}
+                                />
                             </div>
                         </div>
 
