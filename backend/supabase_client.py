@@ -230,3 +230,127 @@ def get_all_users_risk():
     except Exception as e:
         print(f"Error fetching user risks from Supabase: {e}")
         return []
+
+def get_user_insights(user_id: str):
+    """
+    Aggregates chat data to generate real insights for the dashboard.
+    """
+    if not supabase:
+        return {}
+
+    try:
+        # 1. Fetch all chats for the user
+        response = supabase.table("chats").select("messages, updated_at").eq("user_id", user_id).execute()
+        chats = response.data or []
+
+        # 2. Flatten messages
+        all_messages = []
+        for chat in chats:
+            msgs = chat.get("messages", []) or []
+            all_messages.extend(msgs)
+
+        if not all_messages:
+            return {"mood_data": [], "stats": {"logic": 50, "empathy": 50, "motivation": 50}}
+
+        # 3. Aggregate Moods by Day
+        from datetime import datetime, timedelta
+        from collections import defaultdict
+        
+        # Map emotions to numeric scores (0-100)
+        emotion_scores = {
+            "joy": 90, "happy": 90,
+            "neutral": 60, "surprise": 70,
+            "sadness": 40, "sad": 40,
+            "fear": 30, "anger": 20, "disgust": 20
+        }
+        
+        day_buckets = defaultdict(list)
+        
+        for msg in all_messages:
+            # Only count USER messages for "My Mood"
+            if msg.get("sender") == "user" or msg.get("role") == "user":
+                ts_str = msg.get("timestamp") or msg.get("createdAt")
+                if ts_str:
+                    try:
+                        # Normalize timestamp string
+                        ts_str = ts_str.replace('Z', '+00:00').strip()
+                        # Handle cases with space instead of T
+                        if ' ' in ts_str and 'T' not in ts_str:
+                             ts_str = ts_str.replace(' ', 'T')
+                        
+                        dt = datetime.fromisoformat(ts_str)
+                        day_name = dt.strftime("%a") # Mon, Tue...
+                        emotion = msg.get("emotion", "neutral")
+                        score = emotion_scores.get(emotion, 50)
+                        day_buckets[day_name].append(score)
+                    except Exception as e:
+                        # Fallback: try parsing with date util if standard fails, or just ignore
+                        pass
+        
+        # Calculate Averages
+        mood_trend = []
+        days_order = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        
+        for day in days_order:
+            scores = day_buckets.get(day, [])
+            avg_mood = sum(scores) / len(scores) if scores else 50 # Default middle
+            # Energy is simulated based on mood volatility or random for now, as we don't track it explicitly
+            energy = avg_mood + (10 if len(scores) > 5 else 0) 
+            mood_trend.append({"day": day, "mood": int(avg_mood), "energy": int(energy)})
+
+        # 4. Calculate 'Modes' based on recent emotions
+        # If user is sad -> Support Mode (Empathy) rises
+        # If user is neutral -> Logic Mode
+        last_msgs = all_messages[-10:] # Last 10 messages
+        recent_emotions = [m.get("emotion", "neutral") for m in last_msgs if m.get("role") == "user"]
+        
+        sad_count = sum(1 for e in recent_emotions if e in ["sadness", "fear", "sad"])
+        joy_count = sum(1 for e in recent_emotions if e in ["joy", "happy"])
+        
+        empathy_score = 50 + (sad_count * 10)
+        motivation_score = 50 + (joy_count * 10)
+        logic_score = 100 - (empathy_score / 2) - (motivation_score / 2)
+
+        return {
+            "mood_data": mood_trend,
+            "stats": {
+                "logic": int(logic_score),
+                "empathy": int(empathy_score),
+                "motivation": int(motivation_score)
+            }
+        }
+
+    except Exception as e:
+        print(f"Error calculating insights: {e}")
+        return {"mood_data": [], "stats": {}}
+
+def search_chat_history_keyword(user_id: str, query: str):
+    """
+    Searches recent chat history for a keyword if no specific memory is found.
+    Returns: List of strings (excerpts)
+    """
+    if not supabase:
+        return []
+    
+    try:
+        # Fetch last 5 charts
+        response = supabase.table("chats").select("messages, title").eq("user_id", user_id).order("updated_at", desc=True).limit(5).execute()
+        
+        results = []
+        if response.data:
+            for chat in response.data:
+                msgs = chat.get("messages", []) or []
+                for m in msgs:
+                    # Case-insensitive keyword match
+                    txt = m.get("text", "")
+                    if query.lower() in txt.lower() and m.get("sender") == "user":
+                        # meaningful context window? for now just the message
+                        # Verify it's not the query itself (basic filtering)
+                        results.append(f"In chat '{chat.get('title', 'Unknown')}': \"{txt}\"")
+        
+        # Dedupe
+        results = list(set(results))
+        return results[:3] # Top 3
+    except Exception as e:
+        print(f"Error searching chat history: {e}")
+        return []

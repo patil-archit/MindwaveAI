@@ -31,7 +31,7 @@ const MemorySearchPage = () => {
         <div className="min-h-screen bg-warm-bg text-deep-brown font-sans p-6 md:p-12">
             <div className="max-w-3xl mx-auto">
                 <div className="mb-8">
-                    <Link to="/" className="inline-flex items-center gap-2 text-deep-brown/60 hover:text-deep-brown transition-colors mb-4">
+                    <Link to="/" className="inline-flex items-center gap-2 text-deep-brown/60 hover:text-deep-brown transition-colors mb-4 relative z-50">
                         <ArrowLeft size={20} />
                         Back to Chat
                     </Link>
@@ -52,9 +52,9 @@ const MemorySearchPage = () => {
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="e.g., 'When was I last truly happy?' or 'What did I say about my dreams?'"
-                        className="w-full glass-input text-xl py-6 pl-14 pr-6 shadow-xl focus:ring-uprock-orange"
+                        className="w-full glass-input text-xl py-6 pl-16 pr-6 shadow-xl focus:ring-uprock-orange"
                     />
-                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-deep-brown/40" size={24} />
+                    <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-deep-brown/40" size={24} />
                     <button
                         type="submit"
                         disabled={loading}

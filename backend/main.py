@@ -15,7 +15,7 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_core.chat_history import InMemoryChatMessageHistory
 from langchain_core.runnables.history import RunnableWithMessageHistory
-from supabase_client import save_message, get_chat_history, create_chat_in_db, get_user_chats_from_db, delete_chat_from_db, rename_chat_in_db, update_user_risk_score, get_all_users_risk, supabase
+from supabase_client import save_message, get_chat_history, create_chat_in_db, get_user_chats_from_db, delete_chat_from_db, rename_chat_in_db, update_user_risk_score, get_all_users_risk, get_user_insights, search_chat_history_keyword, supabase
 from memory_agent import retrieve_relevant_memories, extract_facts, save_memory
 from council import consult_council
 from graph_agent import extract_graph_data
@@ -57,12 +57,12 @@ def extract_and_save_memory(user_id: str, text: str):
     if fact:
         save_memory(user_id, fact)
 
-async def update_graph_db(user_msg: str):
+async def update_graph_db(user_msg: str, user_id: str):
     """Background task to extract entities and update the persistent graph in Supabase."""
-    print(f"---- [GRAPH DEBUG] Processing Msg: {user_msg[:30]}... ----")
+    print(f"---- [GRAPH DEBUG] Processing Msg: {user_msg[:30]}... for User: {user_id} ----")
     
-    if not supabase:
-        print("Supabase not initialized. Cannot update graph.")
+    if not supabase or not user_id:
+        print("Supabase or User ID missing. Cannot update graph.")
         return
         
     new_data = await extract_graph_data(user_msg)
@@ -72,18 +72,26 @@ async def update_graph_db(user_msg: str):
         return
 
     try:
-        # Load existing graph from Supabase
-        response = supabase.table("knowledge_graph").select("*").limit(1).execute()
+        # Load ALL existing graphs for THIS USER to handle duplicates
+        response = supabase.table("knowledge_graph").select("*").eq("user_id", user_id).order("updated_at", desc=True).execute()
         
+        current_graph = {"nodes": [], "links": []}
+        graph_db_id = None
+
         if response.data and len(response.data) > 0:
+            # Pick the LATEST one as the source of truth
+            latest_row = response.data[0]
             current_graph = {
-                "nodes": response.data[0].get("nodes", []),
-                "links": response.data[0].get("links", [])
+                "nodes": latest_row.get("nodes", []),
+                "links": latest_row.get("links", [])
             }
-            graph_id = response.data[0]["id"]
-        else:
-            current_graph = {"nodes": [], "links": []}
-            graph_id = None
+            graph_db_id = latest_row["id"]
+            
+            # CRITICAL FIX: Delete any *duplicate* rows that might have been created by race conditions
+            if len(response.data) > 1:
+                duplicate_ids = [row["id"] for row in response.data[1:]]
+                print(f"Cleaning up {len(duplicate_ids)} duplicate graphs for user {user_id}")
+                supabase.table("knowledge_graph").delete().in_("id", duplicate_ids).execute()
 
         # Merge Nodes (deduplicate by id)
         existing_ids = {n["id"] for n in current_graph["nodes"]}
@@ -100,20 +108,21 @@ async def update_graph_db(user_msg: str):
                 current_graph["links"].append(link)
                 existing_links.add(link_key)
 
-        # Save to Supabase
+        # Save to Supabase (User Scoped)
         from datetime import datetime
         update_data = {
+            "user_id": user_id,
             "nodes": current_graph["nodes"],
             "links": current_graph["links"],
             "updated_at": datetime.now().isoformat()
         }
         
-        if graph_id:
-            supabase.table("knowledge_graph").update(update_data).eq("id", graph_id).execute()
+        if graph_db_id:
+            supabase.table("knowledge_graph").update(update_data).eq("id", graph_db_id).execute()
         else:
             supabase.table("knowledge_graph").insert(update_data).execute()
             
-        print(f"Graph updated in Supabase: {len(current_graph['nodes'])} nodes, {len(current_graph['links'])} links")
+        print(f"Graph updated for {user_id}: {len(current_graph['nodes'])} nodes")
         
     except Exception as e:
         print(f"Error updating graph in Supabase: {e}")
@@ -258,7 +267,13 @@ async def chat_endpoint(request: ChatRequest, background_tasks: BackgroundTasks)
     try:
         # Run Multi-Agent Debate
         print("5. Consulting Council...")
-        council_result = await consult_council(user_msg, memory_context, request.face_emotion, request.mode, chat_history=history_dicts)
+        council_result = await consult_council(
+            user_msg, 
+            memory_context, 
+            request.face_emotion, # Explicitly pass emotion
+            request.mode, 
+            chat_history=history_dicts
+        )
         print("6. Council returned.")
         
         final_response = council_result["final_response"]
@@ -275,7 +290,7 @@ async def chat_endpoint(request: ChatRequest, background_tasks: BackgroundTasks)
         # [NEW] Update Knowledge Graph from this message (Background)
         # This fixes the request to "analyse data from all my chats"
         print("7b. Updating Neural Graph...")
-        background_tasks.add_task(update_graph_db, user_msg)
+        background_tasks.add_task(update_graph_db, user_msg, uid)
 
         print("8. AI response saved.")
 
@@ -299,26 +314,17 @@ async def monitor_risk_endpoint():
     return get_all_users_risk()
 
 @app.get("/graph")
-async def get_graph_endpoint():
+async def get_graph_endpoint(uid: Optional[str] = None):
     """
     Returns the knowledge graph FROM SUPABASE (Personalized).
     """
-    if not supabase:
+    print(f"Fetching graph for user: {uid}")
+    if not supabase or not uid:
         return {"nodes": [], "links": []}
     
     try:
-        # Fetch the SINGLETON graph for simplicity, or we could fetch by user_id if we passed it.
-        # But wait, the previous code fetched the first row. 
-        # For a true multi-user demo, we should filter by user_id, but the current graph table structure
-        # (check create statement in setup_database.py) might be simple.
-        # Let's check schema.sql... 
-        # Actually, for the demo to work "per account", we need to pass a UID or just fetch 'the' graph.
-        # Given the "whose account is this" complaint, let's assume valid auth is hard to pass in GET /graph easily 
-        # without headers. 
-        # BUT, to fix "My account", I will assume there is ONE graph table.
-        # I will return the latest graph.
-        
-        response = supabase.table("knowledge_graph").select("*").limit(1).order("updated_at", desc=True).execute()
+        # Fetch data strictly for this user
+        response = supabase.table("knowledge_graph").select("*").eq("user_id", uid).limit(1).order("updated_at", desc=True).execute()
         
         if response.data and len(response.data) > 0:
              return {
@@ -328,6 +334,7 @@ async def get_graph_endpoint():
         return {"nodes": [], "links": []}
     except Exception as e:
         print(f"Error fetching graph: {e}")
+        return {"nodes": [], "links": []}
         return {"nodes": [], "links": []}
 
 
@@ -425,7 +432,16 @@ async def search_memories_endpoint(uid: str, q: str):
     """
     Searches the user's long-term memory.
     """
+    # 1. Try Semantic Search (High Threshold)
     memories = retrieve_relevant_memories(uid, q, limit=5)
+    
+    # 2. MATCH FALLBACK: If no semantic memories found, search chat history for keywords
+    if not memories:
+        print(f"No semantic memories found for '{q}'. Searching chat history...")
+        chat_results = search_chat_history_keyword(uid, q)
+        if chat_results:
+             return SearchResult(results=chat_results)
+            
     return SearchResult(results=memories)
 
 class MeditationRequest(BaseModel):
@@ -582,6 +598,16 @@ async def get_all_users_health_data():
     except Exception as e:
         print(f"Error fetching all users health data: {e}")
         return []
+
+@app.get("/insights")
+async def get_insights_endpoint(uid: Optional[str] = None):
+    """
+    Returns personalized insights for the dashboard.
+    """
+    if not uid:
+        return {"mood_data": [], "stats": {}}
+    
+    return get_user_insights(uid)
 
 if __name__ == "__main__":
     import uvicorn

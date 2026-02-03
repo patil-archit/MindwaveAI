@@ -14,6 +14,7 @@ import PhysicalDataPage from './pages/PhysicalDataPage';
 import InsightDashboard from './pages/InsightDashboard';
 import FocusPage from './pages/FocusPage';
 import VideoCounselor from './pages/VideoCounselor';
+import BlockchainPage from './pages/BlockchainPage';
 import PrivateRoute from './components/PrivateRoute';
 import { AuthProvider } from './context/AuthContext';
 
@@ -62,6 +63,11 @@ function App() {
             <Route path="/video-session" element={
               <PrivateRoute>
                 <VideoCounselor />
+              </PrivateRoute>
+            } />
+            <Route path="/blockchain" element={
+              <PrivateRoute>
+                <BlockchainPage />
               </PrivateRoute>
             } />
           </Routes>

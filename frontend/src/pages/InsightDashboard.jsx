@@ -1,20 +1,41 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { Brain, Heart, Zap, Activity, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/$/, '');
 
 const InsightDashboard = () => {
-    // Mock Data for Demo
-    const moodData = [
-        { day: 'Mon', mood: 40, energy: 60 },
-        { day: 'Tue', mood: 30, energy: 50 },
-        { day: 'Wed', mood: 65, energy: 80 },
-        { day: 'Thu', mood: 50, energy: 55 },
-        { day: 'Fri', mood: 80, energy: 90 },
-        { day: 'Sat', mood: 90, energy: 85 },
-        { day: 'Sun', mood: 85, energy: 70 },
-    ];
+    const { currentUser } = useAuth();
+    const [moodData, setMoodData] = useState([]);
+    const [stats, setStats] = useState({ logic: 50, empathy: 50, motivation: 50 });
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!currentUser) return;
+
+        const fetchInsights = async () => {
+            try {
+                const res = await fetch(`${API_BASE_URL}/insights?uid=${currentUser.uid}`);
+                const data = await res.json();
+
+                if (data.mood_data && data.mood_data.length > 0) {
+                    setMoodData(data.mood_data);
+                }
+                if (data.stats) {
+                    setStats(data.stats);
+                }
+            } catch (e) {
+                console.error("Failed to load insights", e);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchInsights();
+    }, [currentUser]);
 
     return (
         <div className="min-h-screen bg-warm-bg p-6 md:p-12 font-sans text-deep-brown pb-24">
@@ -42,8 +63,8 @@ const InsightDashboard = () => {
                             <Brain size={32} />
                         </div>
                         <div>
-                            <div className="text-3xl font-bold">Logic</div>
-                            <div className="text-sm opacity-60">Dominant Mode</div>
+                            <div className="text-3xl font-bold">{stats.logic}%</div>
+                            <div className="text-sm opacity-60">Logic Score</div>
                         </div>
                     </motion.div>
 
@@ -57,7 +78,7 @@ const InsightDashboard = () => {
                             <Heart size={32} />
                         </div>
                         <div>
-                            <div className="text-3xl font-bold">High</div>
+                            <div className="text-3xl font-bold">{stats.empathy}%</div>
                             <div className="text-sm opacity-60">Empathy Score</div>
                         </div>
                     </motion.div>
@@ -72,7 +93,7 @@ const InsightDashboard = () => {
                             <Zap size={32} />
                         </div>
                         <div>
-                            <div className="text-3xl font-bold">Rising</div>
+                            <div className="text-3xl font-bold">{stats.motivation}%</div>
                             <div className="text-sm opacity-60">Motivation Level</div>
                         </div>
                     </motion.div>

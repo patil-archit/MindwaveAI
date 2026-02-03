@@ -42,9 +42,10 @@ def extract_facts(user_input: str) -> Optional[str]:
     try:
         system_prompt = (
             "You are a 'Librarian' for an AI memory system. "
-            "Your job is to read the user's message and extract PERMANENT FACTS about the user (e.g., name, hobbies, pets, job, dislikes). "
-            "Ignore temporary states (e.g., 'I am hungry') or small talk (e.g., 'Hi'). "
-            "If there is a fact, output ONLY the concise fact (e.g. 'User likes sci-fi'). "
+            "Your job is to read the user's message and extract PERMANENT FACTS OR SIGNIFICANT EMOTIONAL EVENTS about the user (e.g., name, hobbies, pets, job, dislikes, recent high stress, trauma, big achievements). "
+            "Ignore trivial temporary states (e.g., 'I am hungry') or small talk (e.g., 'Hi'). "
+            "However, DO record strong emotions like 'I am stressed', 'I am depressed', or 'I feel great' as they are relevant for therapy. "
+            "If there is a fact, output ONLY the concise fact (e.g. 'User likes sci-fi' or 'User reported feeling stressed today'). "
             "If there is nothing worth remembering, output 'NONE'."
         )
         msg = HumanMessage(content=user_input)
@@ -84,21 +85,12 @@ def retrieve_relevant_memories(user_id: str, query: str, limit: int = 3) -> List
         return []
 
     try:
-        # call the 'match_memories' RPC function we created in SQL
-        response = supabase.rpc(
-            "match_memories",
-            {
-                "query_embedding": query_vector,
-                "match_threshold": 0.5, # Adjust based on testing
-                "match_count": limit,
-                "p_user_id": user_id
-            }
-        ).execute()
+        # SKIP RPC for now to ensure reliability (force local search)
+        # response = supabase.rpc(...)
+        raise Exception("Forcing local search")
         
-        memories = [item['content'] for item in response.data]
-        return memories
     except Exception as e:
-        print(f"RPC 'match_memories' failed (likely missing function). Falling back to local search. Error: {e}")
+        print(f"Using Local Vector Search (Fallback). Reason: {e}")
         
         # FALLBACK: Local Vector Search
         try:
@@ -134,7 +126,7 @@ def retrieve_relevant_memories(user_id: str, query: str, limit: int = 3) -> List
                 else:
                     score = np.dot(q_vec, m_vec) / (norm_q * norm_m)
                 
-                if score >= 0.5: # Same threshold as RPC
+                if score >= 0.68: # Adjusted based on testing (0.62 was baseline noise)
                     scored_memories.append((score, item['content']))
             
             # 3. Sort by score desc and take top N

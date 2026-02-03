@@ -246,8 +246,9 @@ const ChatPage = () => {
     useEffect(scrollToBottom, [messages]);
 
     const fetchGraph = async () => {
+        if (!currentUser) return;
         try {
-            const res = await fetch(`${API_BASE_URL}/graph`);
+            const res = await fetch(`${API_BASE_URL}/graph?uid=${currentUser.uid}`);
             const data = await res.json();
             setGraphData(data);
         } catch (e) {

@@ -45,18 +45,30 @@ end;
 $$;
 
 -- 4. Create Knowledge Graph Table
-create table if not exists knowledge_graph (
+-- 4. Create Knowledge Graph Table (With User Isolation)
+drop table if exists knowledge_graph;
+create table knowledge_graph (
   id bigserial primary key,
+  user_id text not null, -- Added user_id
   nodes jsonb default '[]'::jsonb,
   links jsonb default '[]'::jsonb,
   updated_at timestamptz default now()
 );
 
--- 5. Seed Knowledge Graph (So it's not empty)
--- We check if it's empty first
-do $$
-begin
-  if not exists (select 1 from knowledge_graph) then
+-- 5. Seed Knowledge Graph (Empty for now, will be populated per user)
+-- No global seed needed anymore
+
+-- 6. Enable Security
+alter table memories enable row level security;
+alter table knowledge_graph enable row level security;
+
+-- Drop existing policies to prevent "already exists" errors
+-- ISOLATION POLICY: Allow ALL access (Backend handles filtering)
+drop policy if exists "Allow users to access own graph" on knowledge_graph;
+create policy "Allow all access graph" on knowledge_graph for all using (true) with check (true);
+
+drop policy if exists "Allow all access memories" on memories;
+create policy "Allow all access memories" on memories for all using (true) with check (true);
     insert into knowledge_graph (nodes, links)
     values (
       '[

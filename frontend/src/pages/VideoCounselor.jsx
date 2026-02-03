@@ -156,9 +156,16 @@ const VideoCounselor = () => {
     }, [modelsLoaded]);
 
     // Quick TTS Function - Optimized for Human Tone
+    const stopSpeaking = () => {
+        if (window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+            setAiSpeaking(false);
+        }
+    };
+
     const speak = (text) => {
         if (!window.speechSynthesis) return;
-        window.speechSynthesis.cancel();
+        window.speechSynthesis.cancel(); // Always cancel previous before speaking new
 
         const utterance = new SpeechSynthesisUtterance(text);
 
@@ -337,8 +344,15 @@ const VideoCounselor = () => {
                         {isListening ? "Stop Speaking" : "Tap to Speak"}
                     </button>
                     <p className="text-center text-[#4A3728]/40 text-xs mt-4 font-medium">
-                        Press button and ask anything.
+                        Press microphone to speak.
                     </p>
+                    <button
+                        onClick={stopSpeaking}
+                        className="w-full mt-4 py-3 rounded-xl font-bold text-sm bg-gray-200 text-gray-600 hover:bg-gray-300 transition-all flex items-center justify-center gap-2"
+                    >
+                        <VideoOff size={16} />
+                        Silence / Stop Speaking
+                    </button>
                 </div>
             </div>
 

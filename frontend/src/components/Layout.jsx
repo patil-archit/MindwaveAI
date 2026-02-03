@@ -24,6 +24,8 @@ const Layout = ({ children }) => {
                     <Link to="/" className="text-deep-brown font-medium hover:opacity-70 transition-opacity">Home</Link>
                     <Link to="/about" className="text-deep-brown font-medium hover:opacity-70 transition-opacity">About</Link>
                     <Link to="/feel-better" className="text-deep-brown font-medium hover:opacity-70 transition-opacity">Feel Better</Link>
+                    <Link to="/search" className="text-deep-brown font-medium hover:opacity-70 transition-opacity">Vault</Link>
+                    <Link to="/blockchain" className="text-deep-brown font-medium hover:opacity-70 transition-opacity">Crypto</Link>
                     <Link to="/help" className="text-red-600 font-bold hover:opacity-70 transition-opacity flex items-center gap-1">
                         <AlertCircle size={16} />
                         Help
@@ -58,6 +60,8 @@ const Layout = ({ children }) => {
                         <Link to="/" onClick={() => setIsMenuOpen(false)}>Home</Link>
                         <Link to="/about" onClick={() => setIsMenuOpen(false)}>About</Link>
                         <Link to="/feel-better" onClick={() => setIsMenuOpen(false)}>Feel Better</Link>
+                        <Link to="/search" onClick={() => setIsMenuOpen(false)}>Memory Vault</Link>
+                        <Link to="/blockchain" onClick={() => setIsMenuOpen(false)}>Crypto Sanctuary</Link>
                         <Link to="/help" onClick={() => setIsMenuOpen(false)} className="text-red-600 flex items-center gap-2">
                             <AlertCircle size={24} />
                             Help
